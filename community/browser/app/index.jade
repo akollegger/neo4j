@@ -79,6 +79,10 @@ html(class="no-js", lang="en", ng-app="neo4jApp", ng-controller="MainCtrl")
     script(src='components/jquery.easing/js/jquery.easing.js')
     script(src='components/angular-base64/angular-base64.js')
     //endbuild
+    
+    //build:js scripts/lib.js
+    script(src='lib/Neo4jLibrary.journey.js')
+    //endbuild
 
     //build:js(.tmp) scripts/scripts.js
     script(src='scripts/codemirror-cypher.js')

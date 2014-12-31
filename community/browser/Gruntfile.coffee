@@ -1,5 +1,7 @@
 "use strict"
 lrSnippet = require("grunt-contrib-livereload/lib/utils").livereloadSnippet
+path = require("path")
+
 mountFolder = (connect, dir) ->
   connect.static require("path").resolve(dir)
 proxySnippet = require('grunt-connect-proxy/lib/utils').proxyRequest;
@@ -50,8 +52,14 @@ module.exports = (grunt) ->
     yeoman: yeomanConfig
     watch:
       coffee:
-        files: ["<%= yeoman.app %>/scripts/{,*/}*.coffee", "<%= yeoman.lib %>/visualization/**/*.coffee"]
+        files: ["<%= yeoman.app %>/scripts/{,*/}*.coffee",
+                "<%= yeoman.lib %>/visualization/**/*.coffee"
+                ]
         tasks: ["coffee:dist", "coffee:visualization"]
+
+      libraries:
+        files: ["<%= yeoman.lib %>/journey/**/*"]
+        tasks: ["webpack"]
 
       coffeeTest:
         files: ["test/spec/{,*/}*.coffee"]
@@ -62,7 +70,12 @@ module.exports = (grunt) ->
         tasks: ["stylus"]
 
       livereload:
-        files: ["<%= yeoman.app %>/{,*/}*.html", "{.tmp,<%= yeoman.app %>}/styles/{,*/}*.css", "{.tmp,<%= yeoman.app %>}/scripts/{,*/}*.js", "<%= yeoman.app %>/images/{,*/}*.{png,jpg,jpeg,gif,webp,svg}"]
+        files: ["<%= yeoman.app %>/{,*/}*.html",
+          "{.tmp,<%= yeoman.app %>}/styles/{,*/}*.css",
+          "{.tmp,<%= yeoman.app %>}/scripts/{,*/}*.js",
+          "{.tmp,<%= yeoman.app %>}/lib/{,*/}*.js",
+          "<%= yeoman.app %>/images/{,*/}*.{png,jpg,jpeg,gif,webp,svg}"
+          ]
         tasks: ["livereload"]
 
       jade:
@@ -144,6 +157,18 @@ module.exports = (grunt) ->
       unit:
         configFile: "karma.conf.js"
         singleRun: true
+
+    webpack:
+      lib:
+        entry:
+          journey: path.join(__dirname, "lib", "journey", "src", "journey")
+        output:
+          path: path.join(__dirname, ".tmp", "lib")
+          filename: "Neo4jLibrary.[name].js"
+          library: ["neo4j", "lib", "[name]"]
+          libraryTarget: "umd"
+        module:
+          loaders: [ { test: /\.js$/, exclude: /node_modules/, loader: '6to5-loader' } ]
 
     coffee:
       options:
@@ -317,9 +342,11 @@ module.exports = (grunt) ->
         src: ["<%= yeoman.dist %>/styles/main.css"]
 
   grunt.renameTask "regarde", "watch"
-  grunt.registerTask "server", ["clean:server", "coffee", "configureProxies", "stylus", "jade", "livereload-start", "connect:livereload", "watch"]
+
+  grunt.registerTask "libraries", ["webpack"]
+  grunt.registerTask "server", ["clean:server", "libraries", "coffee", "configureProxies", "stylus", "jade", "livereload-start", "connect:livereload", "watch"]
   grunt.registerTask "test", ["clean:server", "coffee", "connect:test", "karma"]
-  grunt.registerTask "build", ["clean:dist", "test", "coffee", "jade", "stylus", "useminPrepare", "concat", "copy", "imagemin", "cssmin", "htmlmin", "uglify", "rev", "usemin", "replace"]
+  grunt.registerTask "build", ["clean:dist", "test", "libraries", "coffee", "jade", "stylus", "useminPrepare", "concat", "copy", "imagemin", "cssmin", "htmlmin", "uglify", "rev", "usemin", "replace"]
   grunt.registerTask "server:dist", ["build", "configureProxies", "connect:dist:keepalive"]
   grunt.registerTask "default", ["build"]
 

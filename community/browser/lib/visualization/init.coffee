@@ -1,4 +1,5 @@
 do ->
+
   noop = ->
 
   nodeOutline = new neo.Renderer(
