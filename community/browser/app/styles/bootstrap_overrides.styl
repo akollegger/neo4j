@@ -39,7 +39,7 @@ form
 
 p.lead
   font-size 16px
-  margin-bottom 0em
+  // margin-bottom 0em
 
 .hero-unit
   padding 1em 60px
@@ -60,3 +60,39 @@ p.lead
       font-size: 17px
       &:before
         content: "\f071"
+
+.view-result article.guide
+  .btn.btn-big[play-topic]
+    padding: 1em
+
+///////////////////
+// column additions
+
+.row-centered
+    text-align:center;
+
+// must use .col-centered inside a .row-centered row
+.col-centered {
+    display:inline-block;
+    float:none;
+    /* reset the text-align */
+    text-align:left;
+    /* inline-block space fix */
+    margin-right:-4px;
+}
+
+.col-fixed {
+  /* custom width */
+  width:320px;
+}
+.col-min {
+  /* custom min width */
+  min-width:320px;
+}
+.col-max {
+  /* custom max width */
+  max-width:320px;
+}
+
+.box-max
+  max-width:320px
