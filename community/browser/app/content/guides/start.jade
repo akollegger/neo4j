@@ -1,0 +1,57 @@
+article.guide
+  .container-fluid
+    .row
+      .col-sm-4
+        .box-max
+          img.img-responsive(src='images/neo4j-world.png')
+          p.lead.text-center {{ neo4j.version }}
+      .col-sm-4
+        .btn.btn-default.btn-app(ng-click="whichTab = 'learn'")
+          img(src="images/learn-icon.png")
+          figcaption Learn
+        .btn.btn-default.btn-app(ng-click="whichTab = 'code'")
+          img(src="images/code-icon.png")
+          figcaption Code
+        .btn.btn-default.btn-app(ng-click="whichTab = 'data'")
+          img(src="images/data-icon.png")
+          figcaption Data
+              
+            
+      .col-sm-4(ng-switch="whichTab")
+        div(ng-switch-default)
+          h3 Learn about Neo4j
+          p.lead A graph epiphany awaits you.
+          ul
+            li What is a graph database?
+            li How can I query a graph?
+            li What do people do with Neo4j?
+          p &nbsp;
+          button.btn.btn-cta(play-topic='concepts') Start Learning (5 minutes)
+        div(ng-switch-when="code")
+          h3 Jump into code
+          p.lead Create some data, try some queries.
+          ul
+            li Code walk-through of a mini graph app
+            li Create graph data using Cypher
+            li Retrieve data, query for answers 
+          p &nbsp;
+          button.btn.btn-cta(play-topic='movie-graph') Write Code (10 minutes)
+        div(ng-switch-when="data")
+          h3 Load graph data
+          p.lead Explore sample datasets.
+          ul
+            li Code walk-through of a mini graph app
+            li Create graph data using Cypher
+            li Retrieve data, query for answers
+          p &nbsp;
+          button.btn.btn-cta(play-topic='load-data') Choose a Graph
+          
+    .hero-unit
+      p(ng-class="{'motd-bang': motd.callToAction.bang}")
+        a(href="{{ motd.callToAction.u}}") {{ motd.callToAction.d }}
+        
+    footer
+      p Copyright &copy;
+        a.no-icon(href='http://neotechnology.com/')  Neo Technology
+        | &nbsp;2002–
+        span= new Date().getFullYear()

@@ -52,12 +52,12 @@ angular.module('neo4jApp.controllers')
         return if $scope.$parent.error_text.length
 
         AuthService.setNewPassword($scope.current_password, $scope.new_password).then(
-          -> 
-          
+          ->
+
             #New user who just changed the default password.
             if not is_authenticated
               $scope.$parent.defaultPasswordChanged()
-              Frame.create({input:"#{Settings.cmdchar}play welcome"})
+              Frame.create({input:"#{Settings.cmdchar}play #{Settings.startFrame}"})
 
             $scope.password_changed = true
             $scope.$parent.error_text = ''

@@ -117,7 +117,7 @@ angular.module('neo4jApp')
       exec: ['$http', ($http) ->
         step_number = 1
         (input, q) ->
-          topic = topicalize(input[('play'.length+1)..]) or 'welcome'
+          topic = topicalize(input[('play'.length+1)..]) or Settings.startFrame
           url = "content/guides/#{topic}.html"
           $http.get(url)
           .success(->q.resolve(page: url))
@@ -257,7 +257,7 @@ angular.module('neo4jApp')
         pattern = new RegExp("^#{cmdchar}server disconnect")
         input.match(pattern)
       exec: ['Settings', 'AuthService', (Settings, AuthService) ->
-        (input, q) -> 
+        (input, q) ->
           q.resolve()
       ]
 
@@ -269,7 +269,7 @@ angular.module('neo4jApp')
         pattern = new RegExp("^#{cmdchar}server status")
         input.match(pattern)
       exec: ['AuthService', (AuthService) ->
-        (input, q) -> 
+        (input, q) ->
           AuthService.getAuthInfo()
           .then(
             (r) ->
@@ -289,7 +289,7 @@ angular.module('neo4jApp')
         pattern = new RegExp("^#{cmdchar}server change-password")
         input.match(pattern)
       exec: ['AuthService', (AuthService) ->
-        (input, q) -> 
+        (input, q) ->
           q.resolve()
           q.promise
       ]
@@ -302,7 +302,7 @@ angular.module('neo4jApp')
         pattern = new RegExp("^#{cmdchar}server invalidate-token")
         input.match(pattern)
       exec: ['AuthService', (AuthService) ->
-        (input, q) -> 
+        (input, q) ->
           q.resolve()
           q.promise
       ]
@@ -315,14 +315,14 @@ angular.module('neo4jApp')
         pattern = new RegExp("^#{cmdchar}server set-token")
         input.match(pattern)
       exec: ['AuthService', (AuthService) ->
-        (input, q) -> 
+        (input, q) ->
           q.resolve()
           q.promise
       ]
 
-    
 
-      
+
+
 
     # Profile a cypher command
     # FrameProvider.interpreters.push
@@ -380,10 +380,10 @@ angular.module('neo4jApp')
               (begin_response) ->
                 commit_fn()
               ,
-              (r) -> 
+              (r) ->
                 q.reject(r)
             )
-            
+
           q.promise.transaction = current_transaction
           q.promise
       ]

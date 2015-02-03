@@ -54,7 +54,7 @@ angular.module('neo4jApp.controllers')
 
         $scope.motd = motdService
         $scope.auth_service = AuthService
-        
+
         $scope.neo4j =
           license =
             type: "GPLv3"
@@ -85,13 +85,13 @@ angular.module('neo4jApp.controllers')
 
         # Authorization
         AuthService.hasValidAuthorization().then(
-          -> 
-            Frame.create({input:"#{Settings.cmdchar}play welcome"})
+          ->
+            Frame.create({input:"#{Settings.cmdchar}play #{Settings.startFrame}"})
             Frame.createOne({input:"#{Settings.cmdchar}server connect"})
           ,
-          (r) -> 
+          (r) ->
             if r.status is 404
-              Frame.create({input:"#{Settings.cmdchar}play welcome"})
+              Frame.create({input:"#{Settings.cmdchar}play #{Settings.startFrame}"})
             else
               Frame.createOne({input:"#{Settings.cmdchar}server connect"})
         )
@@ -109,8 +109,6 @@ angular.module('neo4jApp.controllers')
     'Editor'
     ($scope, Editor) ->
       # everything should be assembled
-      # Editor.setContent(":play intro") 
+      # Editor.setContent(":play intro")
       # Editor.execScript(":play intro")
   ])
-
-
