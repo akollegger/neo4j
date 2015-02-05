@@ -38,7 +38,7 @@ angular.module('neo4jApp.controllers')
       $scope.defaultNotifications = [
           {
             setting:"shouldReportUdc"
-            message:"Hello and thanks for downloading Neo4j! Help us make Neo4j even better by sharing <a href='http://neo4j.com/legal/neo4j-user-experience/'> non&#8209;sensitive data</a>. Would that be OK?"
+            message:"Hello and thanks for downloading Neo4j! Help us make Neo4j even better by sharing <a href='http://neo4j.com/legal/neo4j-ux-improvement-program/'> non&#8209;sensitive data</a>. Would that be OK?"
             style:"warning"
             options:[
               {
