@@ -86,12 +86,12 @@ angular.module('neo4jApp.controllers')
         # Authorization
         AuthService.hasValidAuthorization().then(
           ->
-            Frame.create({input:"#{Settings.cmdchar}play #{Settings.startFrame}"})
+            Frame.create({input:"#{Settings.initCmd}"})
             Frame.createOne({input:"#{Settings.cmdchar}server connect"})
           ,
           (r) ->
             if r.status is 404
-              Frame.create({input:"#{Settings.cmdchar}play #{Settings.startFrame}"})
+              Frame.create({input:"#{Settings.initCmd}"})
             else
               Frame.createOne({input:"#{Settings.cmdchar}server connect"})
         )
