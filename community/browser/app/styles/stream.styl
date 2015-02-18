@@ -26,6 +26,9 @@
     .row.header
       padding-top: 24px
 
+    .row.empty
+      min-height: 48px
+
     .outer
       margin: 0 24px 24px 24px
       box-shadow: 0 1px 6px rgba(0,0,0,0.12)
@@ -52,7 +55,7 @@
             opacity: 0
           &.ng-hide-remove.ng-hide-remove-active, &.ng-hide-add
             opacity: 1
-     
+
 
         .form-info
           font-size: 12px
@@ -119,6 +122,10 @@
       padding: 0
       p
         margin: 0
+      &.tight
+        position: absolute
+        bottom: 0px
+        border-top: 1px solid #c8cbd2
 
 .code-bar
   background: #fff

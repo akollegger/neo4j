@@ -6,34 +6,34 @@ article.guide
           img.img-responsive(src='images/neo4j-world.png')
           p.lead.text-center {{ neo4j.version }}
       .col-sm-4
-        h3 
-          img.img-responsive(src='images/learn-heading.png')
-          | Learn about Neo4j
-        p.lead A graph epiphany awaits you.
-        ul
-          li What is a graph database?
-          li How can I query a graph?
-          li What do people do with Neo4j?
-        p &nbsp;
-        button.btn.btn-cta(play-topic='concepts') Start Learning (5 minutes)
+        h3 Get started
+        p.lead by learning about Neo4j...
+        br
+        ul.big.undecorated
+          li
+            a(play-topic='intro') Intro
+            |  - a guided tour
+          li
+            a(play-topic='concepts') Concepts
+            |  - GraphDB 101
+          li
+            a(play-topic='cypher') Cypher
+            |  - query language
       .col-sm-4
-        h3 
-          img.img-responsive(src='images/code-snippet.png')
-          | Jump into code
-        p.lead Create some data, try some queries.
-        ul
-          li Code walk-through of a mini graph app
-          li Create graph data using Cypher
-          li Retrieve data, query for answers 
-        p &nbsp;
-        button.btn.btn-cta(play-topic='movie-graph') Write Code (10 minutes)
-        
-    .hero-unit
-      p(ng-class="{'motd-bang': motd.callToAction.bang}")
-        a(href="{{ motd.callToAction.u}}") {{ motd.callToAction.d }}
-        
-    footer
-      p Copyright &copy;
-        a.no-icon(href='http://neotechnology.com/')  Neo Technology
-        | &nbsp;2002–
-        span= new Date().getFullYear()
+        h3 Jump into code
+        p.lead with a mini graph app...
+        br
+        ul.big.undecorated
+          li
+            a(play-topic='movie-graph') The Movie Graph
+          //- li
+          //-   a(play-topic='network-graph') Network Management
+          //- li
+          //-   a(play-topic='product-graph') Product Recommendations
+    .row.empty
+
+  footer.tight
+    p Copyright &copy;
+      a.no-icon(href='http://neotechnology.com/')  Neo Technology
+      | &nbsp;2002–
+      span= new Date().getFullYear()
