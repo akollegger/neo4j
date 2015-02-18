@@ -22,24 +22,31 @@ package org.neo4j.kernel.ha.com.slave;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.neo4j.com.MismatchingVersionHandler;
+import org.neo4j.com.ComException;
+import org.neo4j.com.ComExceptionHandler;
+import org.neo4j.com.IllegalProtocolVersionException;
 import org.neo4j.com.ProtocolVersion;
 import org.neo4j.com.monitor.RequestMonitor;
 import org.neo4j.com.storecopy.ResponseUnpacker;
 import org.neo4j.kernel.ha.MasterClient210;
 import org.neo4j.kernel.ha.MasterClient214;
+import org.neo4j.kernel.ha.com.master.InvalidEpochException;
 import org.neo4j.kernel.impl.store.StoreId;
+import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.neo4j.kernel.logging.Logging;
 import org.neo4j.kernel.monitoring.ByteCounterMonitor;
 import org.neo4j.kernel.monitoring.Monitors;
 
-public class MasterClientResolver implements MasterClientFactory, MismatchingVersionHandler
+public class MasterClientResolver implements MasterClientFactory, ComExceptionHandler
 {
     private volatile MasterClientFactory currentFactory;
 
-    private final ResponseUnpacker responseUnpacker;
     private final Map<ProtocolVersion, MasterClientFactory> protocolToFactoryMapping;
+    private final StringLogger log;
+
+    private final ResponseUnpacker responseUnpacker;
+    private final InvalidEpochExceptionHandler invalidEpochHandler;
 
     @Override
     public MasterClient instantiate( String hostNameOrIp, int port, Monitors monitors,
@@ -51,25 +58,43 @@ public class MasterClientResolver implements MasterClientFactory, MismatchingVer
         }
 
         MasterClient result = currentFactory.instantiate( hostNameOrIp, port, monitors, storeId, life );
-        result.addMismatchingVersionHandler( this );
+        result.setComExceptionHandler( this );
         return result;
     }
 
-    @Override
-    public void versionMismatched( byte expected, byte received )
-    {
-        getFor( new ProtocolVersion( received, ProtocolVersion.INTERNAL_PROTOCOL_VERSION ) );
-    }
-
     public MasterClientResolver( Logging logging, ResponseUnpacker responseUnpacker,
-                                 int readTimeout, int lockReadTimeout, int channels, int chunkSize )
+            InvalidEpochExceptionHandler invalidEpochHandler,
+            int readTimeout, int lockReadTimeout, int channels, int chunkSize )
     {
+        this.log = logging.getMessagesLog( getClass() );
         this.responseUnpacker = responseUnpacker;
-        protocolToFactoryMapping = new HashMap<>();
+        this.invalidEpochHandler = invalidEpochHandler;
+
+        protocolToFactoryMapping = new HashMap<>( 2, 1 );
         protocolToFactoryMapping.put( MasterClient210.PROTOCOL_VERSION, new F210( logging, readTimeout, lockReadTimeout,
                 channels, chunkSize ) );
         protocolToFactoryMapping.put( MasterClient214.PROTOCOL_VERSION, new F214( logging, readTimeout, lockReadTimeout,
                 channels, chunkSize ) );
+    }
+
+    @Override
+    public void handle( ComException exception )
+    {
+        if ( exception instanceof IllegalProtocolVersionException )
+        {
+            log.info( "Handling " + exception + ", will pick new master client" );
+
+            IllegalProtocolVersionException illegalProtocolVersion = (IllegalProtocolVersionException) exception;
+            ProtocolVersion requiredProtocolVersion = new ProtocolVersion( illegalProtocolVersion.getReceived(),
+                    ProtocolVersion.INTERNAL_PROTOCOL_VERSION );
+            getFor( requiredProtocolVersion );
+        }
+        else if ( exception instanceof InvalidEpochException )
+        {
+            log.info( "Handling " + exception + ", will go to PENDING and ask for election" );
+
+            invalidEpochHandler.handle();
+        }
     }
 
     private MasterClientFactory getFor( ProtocolVersion protocolVersion )

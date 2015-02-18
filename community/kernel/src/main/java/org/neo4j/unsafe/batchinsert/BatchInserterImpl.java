@@ -22,6 +22,7 @@ package org.neo4j.unsafe.batchinsert;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -103,6 +104,7 @@ import org.neo4j.kernel.impl.store.SchemaStore;
 import org.neo4j.kernel.impl.store.StoreFactory;
 import org.neo4j.kernel.impl.store.UnderlyingStorageException;
 import org.neo4j.kernel.impl.store.UniquenessConstraintRule;
+import org.neo4j.kernel.impl.store.counts.CountsTracker;
 import org.neo4j.kernel.impl.store.id.IdGeneratorImpl;
 import org.neo4j.kernel.impl.store.record.DynamicRecord;
 import org.neo4j.kernel.impl.store.record.IndexRule;
@@ -467,7 +469,19 @@ public class BatchInserterImpl implements BatchInserter
 
     private void rebuildCounts()
     {
-        CountsComputer.computeCounts( neoStore ).accept( new CountsAccessor.Initializer( neoStore.getCounts() ) );
+        CountsTracker counts = neoStore.getCounts();
+        try
+        {
+            counts.start();
+        }
+        catch ( IOException e )
+        {
+            throw new UnderlyingStorageException( e );
+        }
+        try ( CountsAccessor.Updater updater = counts.updater() )
+        {
+            CountsComputer.computeCounts( neoStore ).accept( new CountsAccessor.Initializer( updater ) );
+        }
     }
 
     private class InitialNodeLabelCreationVisitor implements Visitor<NodeLabelUpdate, IOException>
@@ -650,11 +664,32 @@ public class BatchInserterImpl implements BatchInserter
     private long[] getOrCreateLabelIds( Label[] labels )
     {
         long[] ids = new long[labels.length];
+        int cursor = 0;
         for ( int i = 0; i < ids.length; i++ )
         {
-            ids[i] = getOrCreateLabelId( labels[i].name() );
+            int labelId = getOrCreateLabelId( labels[i].name() );
+            if ( !arrayContains( ids, cursor, labelId ) )
+            {
+                ids[cursor++] = labelId;
+            }
+        }
+        if ( cursor < ids.length )
+        {
+            ids = Arrays.copyOf( ids, cursor );
         }
         return ids;
+    }
+
+    private boolean arrayContains( long[] ids, int cursor, int labelId )
+    {
+        for ( int i = 0; i < cursor; i++ )
+        {
+            if ( ids[i] == labelId )
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

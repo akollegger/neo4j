@@ -43,11 +43,15 @@ import scala.collection.{Iterator, mutable}
 final class TransactionBoundQueryContext(graph: GraphDatabaseAPI,
                                          var tx: Transaction,
                                          val isTopLevelTx: Boolean,
-                                         var statement: Statement)
-  extends TransactionBoundTokenContext(statement) with QueryContext {
+                                         initialStatement: Statement)
+  extends TransactionBoundTokenContext(initialStatement) with QueryContext {
 
   private var open = true
   private val txBridge = graph.getDependencyResolver.resolveDependency(classOf[ThreadToStatementContextBridge])
+
+  val nodeOps = new NodeOperations
+
+  val relationshipOps = new RelationshipOperations
 
   def isOpen = open
 
@@ -100,8 +104,17 @@ final class TransactionBoundQueryContext(graph: GraphDatabaseAPI,
   def createRelationship(start: Node, end: Node, relType: String) =
     start.createRelationshipTo(end, withName(relType))
 
+  def getOrCreateRelTypeId(relTypeName: String): Int =
+    statement.tokenWriteOperations().relationshipTypeGetOrCreateForName(relTypeName)
+
   def getLabelsForNode(node: Long) =
     JavaConversionSupport.asScala(statement.readOperations().nodeGetLabels(node))
+
+  def getPropertiesForNode(node: Long) =
+    JavaConversionSupport.asScala(statement.readOperations().nodeGetAllPropertiesKeys(node))
+
+  def getPropertiesForRelationship(relId: Long) =
+    JavaConversionSupport.asScala(statement.readOperations().relationshipGetAllPropertiesKeys(relId))
 
   override def isLabelSetOnNode(label: Int, node: Long) =
     statement.readOperations().nodeHasLabel(node, label)
@@ -122,10 +135,6 @@ final class TransactionBoundQueryContext(graph: GraphDatabaseAPI,
     if (StatementConstants.NO_SUCH_NODE == nodeId) None else Some(nodeOps.getById(nodeId))
   }
 
-  val nodeOps = new NodeOperations
-
-  val relationshipOps = new RelationshipOperations
-
   def removeLabelsFromNode(node: Long, labelIds: Iterator[Int]): Int = labelIds.foldLeft(0) {
     case (count, labelId) =>
       if (statement.dataWriteOperations().nodeRemoveLabel(node, labelId)) count + 1 else count
@@ -133,6 +142,10 @@ final class TransactionBoundQueryContext(graph: GraphDatabaseAPI,
 
   def getNodesByLabel(id: Int): Iterator[Node] =
     mapToScala(statement.readOperations().nodesGetForLabel(id))(nodeOps.getById)
+
+  def nodeGetDegree(node: Long, dir: Direction): Int = statement.readOperations().nodeGetDegree(node, dir)
+
+  def nodeGetDegree(node: Long, dir: Direction, relTypeId: Int): Int = statement.readOperations().nodeGetDegree(node, dir, relTypeId)
 
   private def kernelStatement: KernelStatement =
     txBridge

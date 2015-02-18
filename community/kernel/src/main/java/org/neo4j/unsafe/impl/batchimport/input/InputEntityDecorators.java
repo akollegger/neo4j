@@ -83,4 +83,24 @@ public class InputEntityDecorators
             }
         };
     }
+
+    public static <ENTITY extends InputEntity> Function<ENTITY,ENTITY> decorators(
+            final Function<ENTITY,ENTITY>... decorators )
+    {
+        return new Function<ENTITY,ENTITY>()
+        {
+            @Override
+            public ENTITY apply( ENTITY from ) throws RuntimeException
+            {
+                for ( Function<ENTITY,ENTITY> decorator : decorators )
+                {
+                    from = decorator.apply( from );
+                }
+                return from;
+            }
+        };
+    }
+
+    public static final Function<InputNode,InputNode> NO_NODE_DECORATOR = Functions.identity();
+    public static final Function<InputRelationship,InputRelationship> NO_RELATIONSHIP_DECORATOR = Functions.identity();
 }

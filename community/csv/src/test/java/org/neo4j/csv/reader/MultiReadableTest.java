@@ -19,10 +19,11 @@
  */
 package org.neo4j.csv.reader;
 
-import java.io.IOException;
-import java.io.StringReader;
-
 import org.junit.Test;
+
+import java.io.IOException;
+import java.io.Reader;
+import java.io.StringReader;
 
 import org.neo4j.collection.RawIterator;
 
@@ -41,7 +42,7 @@ public class MultiReadableTest
                 {"where this", "is the second line"},
                 {"and here comes", "the third line"}
         };
-        RawIterator<CharReadable,IOException> readers = readerIteratorFromStrings( data, null );
+        RawIterator<Reader,IOException> readers = readerIteratorFromStrings( data, null );
         CharSeeker seeker = CharSeekers.charSeeker( new MultiReadable( readers ), 200, true, '"' );
 
         // WHEN/THEN
@@ -63,7 +64,7 @@ public class MultiReadableTest
         };
 
         // WHEN
-        RawIterator<CharReadable,IOException> readers = readerIteratorFromStrings( data, '\n' );
+        RawIterator<Reader,IOException> readers = readerIteratorFromStrings( data, '\n' );
         CharSeeker seeker = CharSeekers.charSeeker( Readables.multipleSources( readers ), 200, true, '"' );
 
         // WHEN/THEN
@@ -73,6 +74,35 @@ public class MultiReadableTest
         }
         assertFalse( seeker.seek( mark, delimiter ) );
         seeker.close();
+    }
+
+    @Test
+    public void shouldTrackAbsolutePosition() throws Exception
+    {
+        // GIVEN
+        String[][] data = new String[][] {
+                {"this is", "the first line"},        // 21+delimiter+newline = 23 characters
+                {"where this", "is the second line"}, // 28+delimiter+newline = 30 characters
+        };
+        RawIterator<Reader,IOException> readers = readerIteratorFromStrings( data, '\n' );
+        CharReadable reader = Readables.multipleSources( readers );
+        assertEquals( 0L, reader.position() );
+        SectionedCharBuffer buffer = new SectionedCharBuffer( 15 );
+
+        // WHEN
+        reader.read( buffer, buffer.front() );
+        assertEquals( 15, reader.position() );
+        reader.read( buffer, buffer.front() );
+        assertEquals( "Should not transition to a new reader in the middle of a read", 23, reader.position() );
+        assertEquals( "Reader1", reader.toString() );
+
+        // we will transition to the new reader in the call below
+        reader.read( buffer, buffer.front() );
+        assertEquals( 23+15, reader.position() );
+        reader.read( buffer, buffer.front() );
+        assertEquals( 23+30, reader.position() );
+        reader.read( buffer, buffer.front() );
+        assertFalse( buffer.hasAvailable() );
     }
 
     private void assertNextLine( String[] line, CharSeeker seeker, Mark mark, Extractors extractors ) throws IOException
@@ -85,10 +115,10 @@ public class MultiReadableTest
         assertTrue( mark.isEndOfLine() );
     }
 
-    private RawIterator<CharReadable,IOException> readerIteratorFromStrings(
+    private RawIterator<Reader,IOException> readerIteratorFromStrings(
             final String[][] data, final Character lineEnding )
     {
-        return new RawIterator<CharReadable,IOException>()
+        return new RawIterator<Reader,IOException>()
         {
             private int cursor;
 
@@ -99,9 +129,16 @@ public class MultiReadableTest
             }
 
             @Override
-            public CharReadable next()
+            public Reader next()
             {
-                return Readables.wrap( new StringReader( join( data[cursor++] ) ) );
+                return new StringReader( join( data[cursor++] ) )
+                {
+                    @Override
+                    public String toString()
+                    {
+                        return "Reader" + cursor;
+                    }
+                };
             }
 
             private String join( String[] strings )
@@ -128,5 +165,5 @@ public class MultiReadableTest
 
     private final Mark mark = new Mark();
     private final Extractors extractors = new Extractors( ';' );
-    private final int[] delimiter = new int[] {','};
+    private final int delimiter = ',';
 }

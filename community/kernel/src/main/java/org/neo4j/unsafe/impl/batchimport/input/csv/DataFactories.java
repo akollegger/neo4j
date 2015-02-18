@@ -34,13 +34,15 @@ import org.neo4j.csv.reader.Mark;
 import org.neo4j.csv.reader.Readables;
 import org.neo4j.function.Factory;
 import org.neo4j.function.Function;
+import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.unsafe.impl.batchimport.input.DuplicateHeaderException;
 import org.neo4j.unsafe.impl.batchimport.input.InputEntity;
 import org.neo4j.unsafe.impl.batchimport.input.InputException;
+import org.neo4j.unsafe.impl.batchimport.input.InputNode;
+import org.neo4j.unsafe.impl.batchimport.input.InputRelationship;
 import org.neo4j.unsafe.impl.batchimport.input.MissingHeaderException;
 import org.neo4j.unsafe.impl.batchimport.input.csv.Header.Entry;
 
-import static org.neo4j.csv.reader.BufferedCharSeeker.DEFAULT_BUFFER_SIZE;
 import static org.neo4j.csv.reader.CharSeekers.charSeeker;
 import static org.neo4j.csv.reader.Readables.multipleFiles;
 
@@ -70,7 +72,7 @@ public class DataFactories
                     {
                         try
                         {
-                            return charSeeker( Readables.file( file ), DEFAULT_BUFFER_SIZE,
+                            return charSeeker( Readables.file( file ), config.bufferSize(),
                                     true, config.quotationCharacter() );
                         }
                         catch ( IOException e )
@@ -113,8 +115,15 @@ public class DataFactories
                     @Override
                     public CharSeeker stream()
                     {
-                        return charSeeker( multipleFiles( files ), DEFAULT_BUFFER_SIZE,
-                                           true, config.quotationCharacter() );
+                        try
+                        {
+                            return charSeeker( multipleFiles( files ), config.bufferSize(),
+                                               true, config.quotationCharacter() );
+                        }
+                        catch ( IOException e )
+                        {
+                            throw new InputException( e.getMessage(), e );
+                        }
                     }
 
                     @Override
@@ -145,7 +154,7 @@ public class DataFactories
                     @Override
                     public CharSeeker stream()
                     {
-                        return charSeeker( readable.newInstance(), DEFAULT_BUFFER_SIZE,
+                        return charSeeker( readable.newInstance(), config.bufferSize(),
                                            true, config.quotationCharacter() );
                     }
 
@@ -268,7 +277,7 @@ public class DataFactories
         @Override
         public CharSeeker open( CharSeeker seeker, Configuration config ) throws IOException
         {
-            return charSeeker( readable, DEFAULT_BUFFER_SIZE, true, config.quotationCharacter() );
+            return charSeeker( readable, config.bufferSize(), true, config.quotationCharacter() );
         }
     }
 
@@ -294,7 +303,7 @@ public class DataFactories
                 Mark mark = new Mark();
                 Extractors extractors = new Extractors( config.arrayDelimiter() );
                 Extractor<?> idExtractor = idType.extractor( extractors );
-                int[] delimiter = new int[] {config.delimiter()};
+                int delimiter = config.delimiter();
                 List<Header.Entry> columns = new ArrayList<>();
                 for ( int i = 0; !mark.isEndOfLine() && headerSeeker.seek( mark, delimiter ); i++ )
                 {
@@ -457,7 +466,8 @@ public class DataFactories
     {
         protected DefaultRelationshipFileHeaderParser( HeaderCharSeekerFactory headerCharSeekerFactory )
         {
-            super( headerCharSeekerFactory, Type.START_ID, Type.END_ID, Type.TYPE );
+            // Don't have TYPE as mandatory since a decorator could provide that
+            super( headerCharSeekerFactory, Type.START_ID, Type.END_ID );
         }
 
         @Override
@@ -494,5 +504,17 @@ public class DataFactories
 
             return new Header.Entry( name, type, groupName, extractor );
         }
+    }
+
+    @SafeVarargs
+    public static Iterable<DataFactory<InputNode>> nodeData( DataFactory<InputNode>... factories )
+    {
+        return Iterables.iterable( factories );
+    }
+
+    @SafeVarargs
+    public static Iterable<DataFactory<InputRelationship>> relationshipData( DataFactory<InputRelationship>... factories )
+    {
+        return Iterables.iterable( factories );
     }
 }

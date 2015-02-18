@@ -21,13 +21,8 @@ package org.neo4j.server.modules;
 
 import java.util.List;
 
-import org.neo4j.kernel.configuration.Config;
-import org.neo4j.server.configuration.ServerSettings;
-import org.neo4j.server.rest.dbms.AuthenticationService;
-import org.neo4j.server.rest.dbms.AuthorizationFilter;
 import org.neo4j.server.rest.dbms.UserService;
 import org.neo4j.server.rest.discovery.DiscoveryService;
-import org.neo4j.server.security.auth.SecurityCentral;
 import org.neo4j.server.web.WebServer;
 
 import static org.neo4j.server.JAXRSHelper.listFrom;
@@ -40,31 +35,22 @@ public class DBMSModule implements ServerModule
     private static final String ROOT_PATH = "/";
 
     private final WebServer webServer;
-    private final SecurityCentral security;
-    private final boolean enableAuthentication;
 
-    public DBMSModule( WebServer webServer, SecurityCentral security, Config config )
+    public DBMSModule( WebServer webServer )
     {
         this.webServer = webServer;
-        this.security = security;
-        this.enableAuthentication = config.get( ServerSettings.authorization_enabled );
     }
 
     @Override
     public void start()
     {
         webServer.addJAXRSClasses( getClassNames(), ROOT_PATH, null );
-        if(enableAuthentication)
-        {
-            webServer.addFilter( new AuthorizationFilter(security), "/*" );
-        }
     }
 
     private List<String> getClassNames()
     {
         return listFrom(
                 DiscoveryService.class.getName(),
-                AuthenticationService.class.getName(),
                 UserService.class.getName());
     }
 

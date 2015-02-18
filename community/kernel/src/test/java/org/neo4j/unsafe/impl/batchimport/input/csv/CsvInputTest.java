@@ -19,12 +19,12 @@
  */
 package org.neo4j.unsafe.impl.batchimport.input.csv;
 
+import org.junit.Rule;
+import org.junit.Test;
+
 import java.io.StringReader;
 import java.util.Iterator;
 import java.util.Set;
-
-import org.junit.Rule;
-import org.junit.Test;
 
 import org.neo4j.csv.reader.BufferedCharSeeker;
 import org.neo4j.csv.reader.CharSeeker;
@@ -36,16 +36,21 @@ import org.neo4j.graphdb.ResourceIterator;
 import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.test.TargetDirectory;
 import org.neo4j.test.TargetDirectory.TestDirectory;
+import org.neo4j.unsafe.impl.batchimport.InputIterator;
+import org.neo4j.unsafe.impl.batchimport.input.DataException;
 import org.neo4j.unsafe.impl.batchimport.input.Group;
 import org.neo4j.unsafe.impl.batchimport.input.Groups;
 import org.neo4j.unsafe.impl.batchimport.input.Input;
 import org.neo4j.unsafe.impl.batchimport.input.InputEntity;
+import org.neo4j.unsafe.impl.batchimport.input.InputException;
 import org.neo4j.unsafe.impl.batchimport.input.InputNode;
 import org.neo4j.unsafe.impl.batchimport.input.InputRelationship;
 
+import static org.hamcrest.CoreMatchers.containsString;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.spy;
@@ -101,8 +106,8 @@ public class CsvInputTest
 
         // WHEN/THEN
         Iterator<InputRelationship> relationships = input.relationships().iterator();
-        assertRelationship( relationships.next(), 0L, "node1", "node2", "KNOWS", properties( "since", 1234567L ) );
-        assertRelationship( relationships.next(), 1L, "node2", "node10", "HACKS", properties( "since", 987654L ) );
+        assertRelationship( relationships.next(), "node1", "node2", "KNOWS", properties( "since", 1234567L ) );
+        assertRelationship( relationships.next(), "node2", "node10", "HACKS", properties( "since", 987654L ) );
     }
 
     @Test
@@ -113,7 +118,8 @@ public class CsvInputTest
         CharSeeker relationshipData = spy( charSeeker( "test" ) );
         IdType idType = IdType.STRING;
         Iterable<DataFactory<InputNode>> nodeDataIterable = dataIterable( given( nodeData ) );
-        Iterable<DataFactory<InputRelationship>> relationshipDataIterable = dataIterable( given( relationshipData ) );
+        Iterable<DataFactory<InputRelationship>> relationshipDataIterable =
+                dataIterable( data( relationshipData, defaultRelationshipType( "TYPE" ) ) );
         Input input = new CsvInput(
                 nodeDataIterable, header(
                         entry( null, Type.ID, idType.extractor( extractors ) ) ),
@@ -256,10 +262,38 @@ public class CsvInputTest
         // WHEN/THEN
         try ( ResourceIterator<InputRelationship> relationships = input.relationships().iterator() )
         {
-            assertRelationship( relationships.next(), 0L, 0L, 1L, defaultType, NO_PROPERTIES );
-            assertRelationship( relationships.next(), 1L, 1L, 2L, customType, NO_PROPERTIES );
-            assertRelationship( relationships.next(), 2L, 2L, 1L, defaultType, NO_PROPERTIES );
+            assertRelationship( relationships.next(), 0L, 1L, defaultType, NO_PROPERTIES );
+            assertRelationship( relationships.next(), 1L, 2L, customType, NO_PROPERTIES );
+            assertRelationship( relationships.next(), 2L, 1L, defaultType, NO_PROPERTIES );
             assertFalse( relationships.hasNext() );
+        }
+    }
+
+    @Test
+    public void shouldFailOnMissingRelationshipType() throws Exception
+    {
+        // GIVEN
+        String type = "CUSTOM";
+        DataFactory<InputRelationship> data = data( ":START_ID,:END_ID,:TYPE\n" +
+                "0,1," + type + "\n" +
+                "1,2," );
+        Iterable<DataFactory<InputRelationship>> dataIterable = dataIterable( data );
+        Input input = new CsvInput( null, null,
+                dataIterable, defaultFormatRelationshipFileHeader(), IdType.ACTUAL, Configuration.COMMAS );
+
+        // WHEN/THEN
+        try ( ResourceIterator<InputRelationship> relationships = input.relationships().iterator() )
+        {
+            assertRelationship( relationships.next(), 0L, 1L, type, NO_PROPERTIES );
+            try
+            {
+                relationships.next();
+                fail( "Should have failed" );
+            }
+            catch ( DataException e )
+            {
+                assertTrue( e.getMessage().contains( Type.TYPE.name() ) );
+            }
         }
     }
 
@@ -503,14 +537,67 @@ public class CsvInputTest
 
         // WHEN/THEN
         Iterator<InputRelationship> relationships = input.relationships().iterator();
-        assertRelationship( relationships.next(), 0, startNodeGroup, 123L, endNodeGroup, 234L, "TYPE", properties() );
-        assertRelationship( relationships.next(), 1, startNodeGroup, 345L, endNodeGroup, 456L, "TYPE", properties() );
+        assertRelationship( relationships.next(), startNodeGroup, 123L, endNodeGroup, 234L, "TYPE", properties() );
+        assertRelationship( relationships.next(), startNodeGroup, 345L, endNodeGroup, 456L, "TYPE", properties() );
         assertFalse( relationships.hasNext() );
+    }
+
+    @Test
+    public void shouldDoWithoutRelationshipTypeHeaderIfDefaultSupplied() throws Exception
+    {
+        // GIVEN relationship data w/o :TYPE header
+        String defaultType = "HERE";
+        DataFactory<InputRelationship> data = data(
+                ":START_ID,:END_ID,name\n" +
+                "0,1,First\n" +
+                "2,3,Second\n", defaultRelationshipType( defaultType ) );
+        Iterable<DataFactory<InputRelationship>> dataIterable = dataIterable( data );
+        Input input = new CsvInput( null, null, dataIterable, defaultFormatRelationshipFileHeader(),
+                IdType.ACTUAL, COMMAS );
+
+        // WHEN
+        try ( ResourceIterator<InputRelationship> relationships = input.relationships().iterator() )
+        {
+            // THEN
+            assertRelationship( relationships.next(), 0L, 1L, defaultType, properties( "name", "First" ) );
+            assertRelationship( relationships.next(), 2L, 3L, defaultType, properties( "name", "Second" ) );
+            assertFalse( relationships.hasNext() );
+        }
+    }
+
+    @Test
+    public void shouldIncludeDataSourceInformationOnBadFieldValueOrLine() throws Exception
+    {
+        // GIVEN
+        Iterable<DataFactory<InputNode>> data = DataFactories.nodeData( CsvInputTest.<InputNode>data(
+                ":ID,name,other:int\n" +
+                "1,Mattias,10\n" +
+                "2,Johan,abc\n" +
+                "3,Emil,12" ) );
+        Input input = new CsvInput( data, DataFactories.defaultFormatNodeFileHeader(), null, null,
+                IdType.INTEGER, Configuration.COMMAS );
+
+        // WHEN
+        try ( InputIterator<InputNode> nodes = input.nodes().iterator() )
+        {
+            assertNode( nodes.next(), 1L, new Object[] {"name", "Mattias", "other", 10}, labels() );
+            try
+            {
+                nodes.next();
+                fail( "Should have failed" );
+            }
+            catch ( InputException e )
+            {
+                // THEN
+                assertThat( e.getMessage(), containsString( "other" ) );
+                assertThat( e.getMessage(), containsString( "abc" ) );
+            }
+        }
     }
 
     private Configuration customConfig( final char delimiter, final char arrayDelimiter, final char quote )
     {
-        return new Configuration()
+        return new Configuration.Default()
         {
             @Override
             public char quotationCharacter()
@@ -539,12 +626,25 @@ public class CsvInputTest
             @Override
             public Data<ENTITY> create( Configuration config )
             {
-                return noDecoratorData( data, Functions.<ENTITY>identity() );
+                return dataItem( data, Functions.<ENTITY>identity() );
             }
         };
     }
 
-    private <ENTITY extends InputEntity> Data<ENTITY> noDecoratorData( final CharSeeker data,
+    private <ENTITY extends InputEntity> DataFactory<ENTITY> data( final CharSeeker data,
+            final Function<ENTITY,ENTITY> decorator )
+    {
+        return new DataFactory<ENTITY>()
+        {
+            @Override
+            public Data<ENTITY> create( Configuration config )
+            {
+                return dataItem( data, decorator );
+            }
+        };
+    }
+
+    private static <ENTITY extends InputEntity> Data<ENTITY> dataItem( final CharSeeker data,
             final Function<ENTITY,ENTITY> decorator )
     {
         return new Data<ENTITY>()
@@ -563,21 +663,21 @@ public class CsvInputTest
         };
     }
 
-    private void assertRelationship( InputRelationship relationship, long id,
+    private void assertRelationship( InputRelationship relationship,
             Object startNode, Object endNode, String type, Object[] properties )
     {
-        assertRelationship( relationship, id, GLOBAL, startNode, GLOBAL, endNode, type, properties );
+        assertRelationship( relationship, GLOBAL, startNode, GLOBAL, endNode, type, properties );
     }
 
-    private void assertRelationship( InputRelationship relationship, long id,
+    private void assertRelationship( InputRelationship relationship,
             Group startNodeGroup, Object startNode,
             Group endNodeGroup, Object endNode,
             String type, Object[] properties )
     {
-        assertEquals( id, relationship.id() );
+        assertFalse( relationship.hasSpecificId() );
         assertEquals( startNodeGroup, relationship.startNodeGroup() );
         assertEquals( startNode, relationship.startNode() );
-        assertEquals( endNodeGroup, relationship.endNodeGroup() );
+        assertEquals( endNodeGroup.id(), relationship.endNodeGroup().id() );
         assertEquals( endNode, relationship.endNode() );
         assertEquals( type, relationship.type() );
         assertArrayEquals( properties, relationship.properties() );
@@ -590,7 +690,7 @@ public class CsvInputTest
 
     private void assertNode( InputNode node, Group group, Object id, Object[] properties, Set<String> labels )
     {
-        assertEquals( group, node.group() );
+        assertEquals( group.id(), node.group().id() );
         assertEquals( id, node.id() );
         assertArrayEquals( properties, node.properties() );
         assertEquals( labels, asSet( node.labels() ) );
@@ -628,12 +728,12 @@ public class CsvInputTest
         return new Header.Entry( name, type, groupName, extractor );
     }
 
-    private <ENTITY extends InputEntity> DataFactory<ENTITY> data( final String data )
+    private static <ENTITY extends InputEntity> DataFactory<ENTITY> data( final String data )
     {
         return data( data, Functions.<ENTITY>identity() );
     }
 
-    private <ENTITY extends InputEntity> DataFactory<ENTITY> data( final String data,
+    private static <ENTITY extends InputEntity> DataFactory<ENTITY> data( final String data,
             final Function<ENTITY,ENTITY> decorator )
     {
         return new DataFactory<ENTITY>()
@@ -641,14 +741,14 @@ public class CsvInputTest
             @Override
             public Data<ENTITY> create( Configuration config )
             {
-                return noDecoratorData( charSeeker( data ), decorator );
+                return dataItem( charSeeker( data ), decorator );
             }
         };
     }
 
-    private CharSeeker charSeeker( String data )
+    private static CharSeeker charSeeker( String data )
     {
-        return new BufferedCharSeeker( wrap( new StringReader( data ) ) );
+        return new BufferedCharSeeker( wrap( new StringReader( data ) ), 1_000 );
     }
 
     @SuppressWarnings( { "rawtypes", "unchecked" } )

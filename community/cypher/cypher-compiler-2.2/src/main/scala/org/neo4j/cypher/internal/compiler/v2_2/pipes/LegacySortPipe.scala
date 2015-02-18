@@ -21,6 +21,7 @@ package org.neo4j.cypher.internal.compiler.v2_2.pipes
 
 import org.neo4j.cypher.internal.compiler.v2_2._
 import org.neo4j.cypher.internal.compiler.v2_2.commands.SortItem
+import org.neo4j.cypher.internal.compiler.v2_2.executionplan.Effects
 import org.neo4j.cypher.internal.compiler.v2_2.executionplan.Effects._
 import org.neo4j.cypher.internal.compiler.v2_2.planDescription.InternalPlanDescription.Arguments.LegacyExpression
 
@@ -30,9 +31,13 @@ case class LegacySortPipe(source: Pipe, sortDescription: List[SortItem])
               (implicit pipeMonitor: PipeMonitor) extends PipeWithSource(source, pipeMonitor) with ExecutionContextComparer {
   def symbols = source.symbols
 
-  protected def internalCreateResults(input: Iterator[ExecutionContext], state: QueryState) =
+  protected def internalCreateResults(input: Iterator[ExecutionContext], state: QueryState) = {
+    //register as parent so that stats are associated with this pipe
+    state.decorator.registerParentPipe(this)
+
     input.toList.
       sortWith((a, b) => compareBy(a, b, sortDescription)(state)).iterator
+  }
 
   def planDescription =
     source.planDescription.andThen(this, "Sort", identifiers, sortDescription.map(item => LegacyExpression(item.expression)):_*)
@@ -42,6 +47,9 @@ case class LegacySortPipe(source: Pipe, sortDescription: List[SortItem])
     copy(source = source)
   }
 
+  // no local effects
+  override val localEffects = Effects.NONE
+  // the global effects are the one produced by the expression of the SortItems
   override def effects = sortDescription.effects
 }
 

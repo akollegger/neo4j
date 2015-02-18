@@ -36,6 +36,16 @@ final class RepeatableReadQueryContext(inner: QueryContext, locker: Locker) exte
     inner.getLabelsForNode(node)
   }
 
+  override def nodeGetDegree(node: Long, dir: Direction): Int = {
+    lockNode(node)
+    inner.nodeGetDegree(node, dir)
+  }
+
+  override def nodeGetDegree(node: Long, dir: Direction, relTypeId: Int): Int = {
+    lockNode(node)
+    inner.nodeGetDegree(node, dir, relTypeId)
+  }
+
   override def isLabelSetOnNode(label: Int, node: Long): Boolean = {
     lockNode(node)
     inner.isLabelSetOnNode(label, node)
@@ -56,6 +66,18 @@ final class RepeatableReadQueryContext(inner: QueryContext, locker: Locker) exte
   def releaseLocks() {
     locker.releaseAllLocks()
   }
+
+
+  override def getPropertiesForNode(node: Long): Iterator[Long] = {
+    lockNode(node)
+    inner.getPropertiesForNode(node)
+  }
+
+  override def getPropertiesForRelationship(relId: Long): Iterator[Long] = {
+    lockRelationship(relId)
+    inner.getPropertiesForRelationship(relId)
+  }
+
 
   class RepeatableReadOperations[T <: PropertyContainer](inner: Operations[T]) extends DelegatingOperations[T](inner) {
     override def getProperty(id: Long, propertyKeyId: Int) = {
@@ -85,6 +107,10 @@ final class RepeatableReadQueryContext(inner: QueryContext, locker: Locker) exte
 
   private def lockNode(id: Long) {
     locker.acquireLock(nodeOps.getByInnerId(id))
+  }
+
+  private def lockRelationship(id : Long) {
+    locker.acquireLock(relationshipOps.getByInnerId(id))
   }
 
   private def lockAll[T <: PropertyContainer](iter: Iterator[T]): Iterator[T] = iter.map {

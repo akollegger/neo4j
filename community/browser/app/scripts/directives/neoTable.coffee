@@ -1,5 +1,5 @@
 ###!
-Copyright (c) 2002-2014 "Neo Technology,"
+Copyright (c) 2002-2015 "Neo Technology,"
 Network Engine for Objects in Lund AB [http://neotechnology.com]
 
 This file is part of Neo4j.
@@ -50,7 +50,7 @@ angular.module('neo4jApp.directives')
           if angular.isString(cell)
             escapeHtml(cell)
           else if angular.isArray(cell)
-            (cell2html(el) for el in cell).join(', ')
+            "["+((cell2html(el) for el in cell).join(', '))+"]"
           else if angular.isObject(cell)
             json2html(cell)
           else

@@ -1,5 +1,5 @@
 ###!
-Copyright (c) 2002-2014 "Neo Technology,"
+Copyright (c) 2002-2015 "Neo Technology,"
 Network Engine for Objects in Lund AB [http://neotechnology.com]
 
 This file is part of Neo4j.
@@ -25,27 +25,19 @@ angular.module('neo4jApp.services')
   'localStorageService'
   '$base64'
   (localStorageService, $base64) ->
-    cached_authorization_data = localStorageService.get('authorization_token') || ''
-    @is_authenticated = if cached_authorization_data or @is_authenticated then yes else no
-    @current_user = false
-    @setCurrentUser = (user_obj) ->
-      @current_user = user_obj
-    @setAuthenticated = (is_authenticated) ->
-      @is_authenticated = is_authenticated
-    @isAuthenticated = ->
-      @is_authenticated
+    cached_authorization_data = localStorageService.get('authorization_data') || ''
     @setAuthData = (authdata) ->
       return unless authdata
       encoded = $base64.encode(authdata)
       cached_authorization_data = encoded
-      localStorageService.set('authorization_token', encoded)
-      @setAuthenticated yes
+      localStorageService.set('authorization_data', encoded)
     @clearAuthData = ->
-      localStorageService.remove('authorization_token')
+      localStorageService.remove('authorization_data')
       cached_authorization_data = null
     @getAuthData = ->
-      return cached_authorization_data || localStorageService.get('authorization_token') || ''
-    @getAuthToken = ->
-      return $base64.decode(cached_authorization_data || localStorageService.get('authorization_token') || '')
+      return cached_authorization_data || localStorageService.get('authorization_data') || ''
+    @getPlainAuthData = ->
+      data = (cached_authorization_data || localStorageService.get('authorization_data'))
+      if data then $base64.decode(data) else ''
     @
 ]

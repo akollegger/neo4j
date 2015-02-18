@@ -22,11 +22,10 @@ package org.neo4j.cypher.internal.compiler.v2_2.pipes
 import org.neo4j.cypher.internal.compiler.v2_2._
 import org.neo4j.cypher.internal.compiler.v2_2.executionplan.Effects
 import org.neo4j.cypher.internal.compiler.v2_2.mutation.Effectful
-import org.neo4j.cypher.internal.compiler.v2_2.planDescription.{SingleRowPlanDescription, InternalPlanDescription}
+import org.neo4j.cypher.internal.compiler.v2_2.planDescription.{InternalPlanDescription, SingleRowPlanDescription}
 import org.neo4j.cypher.internal.compiler.v2_2.symbols._
 import org.neo4j.helpers.ThisShouldNotHappenError
 
-import scala.collection.Set
 import scala.collection.immutable
 
 trait PipeMonitor {
@@ -74,7 +73,7 @@ trait Pipe extends Effectful {
 
   def sources: Seq[Pipe]
 
-  def localEffects: Effects = Effects.ALL
+  def localEffects: Effects
 
   def effects: Effects = localEffects
 
@@ -103,10 +102,10 @@ case class SingleRowPipe()(implicit val monitor: PipeMonitor) extends Pipe with 
 
   def sources: Seq[Pipe] = Seq.empty
 
-  def estimatedCardinality: Option[Long] = Some(1)
+  def estimatedCardinality: Option[Double] = Some(1.0)
 
-  def withEstimatedCardinality(estimated: Long): Pipe with RonjaPipe = {
-    assert(estimated == 1)
+  def withEstimatedCardinality(estimated: Double): Pipe with RonjaPipe = {
+    assert(estimated == 1.0)
     this
   }
 }
@@ -127,8 +126,7 @@ abstract class PipeWithSource(source: Pipe, val monitor: PipeMonitor) extends Pi
 
   override val sources: Seq[Pipe] = Seq(source)
 
-  override def effects =
-    sources.foldLeft(localEffects)(_ | _.effects)
+  override def effects = sources.foldLeft(localEffects)(_ | _.effects)
 
   def exists(pred: Pipe => Boolean) = pred(this) || source.exists(pred)
 }

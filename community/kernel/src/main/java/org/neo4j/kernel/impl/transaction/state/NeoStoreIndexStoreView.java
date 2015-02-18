@@ -35,6 +35,7 @@ import org.neo4j.kernel.api.index.IndexDescriptor;
 import org.neo4j.kernel.api.index.NodePropertyUpdate;
 import org.neo4j.kernel.api.labelscan.NodeLabelUpdate;
 import org.neo4j.kernel.api.properties.Property;
+import org.neo4j.kernel.impl.api.CountsAccessor;
 import org.neo4j.kernel.impl.api.index.IndexStoreView;
 import org.neo4j.kernel.impl.api.index.StoreScan;
 import org.neo4j.kernel.impl.locking.Lock;
@@ -89,8 +90,11 @@ public class NeoStoreIndexStoreView implements IndexStoreView
     {
         int labelId = descriptor.getLabelId();
         int propertyKeyId = descriptor.getPropertyKeyId();
-        counts.replaceIndexSample( labelId, propertyKeyId, uniqueElements, maxUniqueElements );
-        counts.replaceIndexUpdateAndSize( labelId, propertyKeyId, 0l, indexSize );
+        try ( CountsAccessor.Updater updater = counts.updater() )
+        {
+            updater.replaceIndexSample( labelId, propertyKeyId, uniqueElements, maxUniqueElements );
+            updater.replaceIndexUpdateAndSize( labelId, propertyKeyId, 0l, indexSize );
+        }
     }
 
     @Override
@@ -206,7 +210,7 @@ public class NeoStoreIndexStoreView implements IndexStoreView
         ArrayList<NodePropertyUpdate> updates = new ArrayList<>();
         for ( PropertyRecord propertyRecord : propertyStore.getPropertyRecordChain( firstPropertyId ) )
         {
-            for ( PropertyBlock property : propertyRecord.getPropertyBlocks() )
+            for ( PropertyBlock property : propertyRecord )
             {
                 Object value = property.getType().getValue( property, propertyStore );
                 updates.add( NodePropertyUpdate.add( node.getId(), property.getKeyIndexId(), value, labels ) );
@@ -335,7 +339,7 @@ public class NeoStoreIndexStoreView implements IndexStoreView
                 {
                     return null;
                 }
-                blocks = records.next().getPropertyBlocks().iterator();
+                blocks = records.next().iterator();
             }
         }
     }

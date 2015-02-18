@@ -24,6 +24,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.neo4j.cluster.BindingListener;
@@ -83,6 +84,7 @@ public class HighAvailabilityModeSwitcher implements HighAvailabilityMemberListe
     private final SwitchToMaster switchToMaster;
     private final Election election;
     private final ClusterMemberAvailability clusterMemberAvailability;
+    private final InstanceId instanceId;
     private final DependencyResolver dependencyResolver;
 
     private final StringLogger msgLog;
@@ -94,18 +96,20 @@ public class HighAvailabilityModeSwitcher implements HighAvailabilityMemberListe
     private volatile URI me;
     private volatile Future<?> modeSwitcherFuture;
     private volatile HighAvailabilityMemberState currentTargetState;
+    private final AtomicBoolean canAskForElections = new AtomicBoolean( true );
 
     public HighAvailabilityModeSwitcher( SwitchToSlave switchToSlave,
                                          SwitchToMaster switchToMaster,
                                          Election election,
                                          ClusterMemberAvailability clusterMemberAvailability,
                                          DependencyResolver dependencyResolver,
-                                         Logging logging )
+                                         InstanceId instanceId, Logging logging )
     {
         this.switchToSlave = switchToSlave;
         this.switchToMaster = switchToMaster;
         this.election = election;
         this.clusterMemberAvailability = clusterMemberAvailability;
+        this.instanceId = instanceId;
         this.msgLog = logging.getMessagesLog( getClass() );
         this.consoleLog = logging.getConsoleLog( getClass() );
         this.haCommunicationLife = new LifeSupport();
@@ -121,7 +125,7 @@ public class HighAvailabilityModeSwitcher implements HighAvailabilityMemberListe
     @Override
     public synchronized void init() throws Throwable
     {
-        modeSwitcherExecutor = Executors.newSingleThreadScheduledExecutor( named( "HA Mode switcher" ) );
+        modeSwitcherExecutor = createExecutor();
 
         haCommunicationLife.init();
     }
@@ -184,6 +188,15 @@ public class HighAvailabilityModeSwitcher implements HighAvailabilityMemberListe
     public void instanceStops( HighAvailabilityMemberChangeEvent event )
     {
         stateChanged( event );
+    }
+
+    public void forceElections()
+    {
+        if ( canAskForElections.compareAndSet( true, false ) )
+        {
+            clusterMemberAvailability.memberIsUnavailable( HighAvailabilityModeSwitcher.SLAVE );
+            election.performRoleElections();
+        }
     }
 
     private void stateChanged( HighAvailabilityMemberChangeEvent event )
@@ -252,13 +265,13 @@ public class HighAvailabilityModeSwitcher implements HighAvailabilityMemberListe
                 try
                 {
                     masterHaURI = switchToMaster.switchToMaster( haCommunicationLife, me );
+                    canAskForElections.set( true );
                 }
                 catch ( Throwable e )
                 {
                     msgLog.logMessage( "Failed to switch to master", e );
-
                     // Since this master switch failed, elect someone else
-                    election.demote( getServerId( me ) );
+                    election.demote( instanceId );
                 }
             }
         }, cancellationHandle );
@@ -276,7 +289,7 @@ public class HighAvailabilityModeSwitcher implements HighAvailabilityMemberListe
          * to complete, all in a single thread executor. However, this is a check worth doing because if this
          * condition slips through via some other code path it can cause trouble.
          */
-        if ( getServerId( masterUri ).equals( getServerId( me ) ) )
+        if ( getServerId( masterUri ).equals( instanceId ) )
         {
             msgLog.error( "I (" + me + ") tried to switch to slave for myself as master (" + masterUri + ")"  );
             return;
@@ -311,6 +324,7 @@ public class HighAvailabilityModeSwitcher implements HighAvailabilityMemberListe
                     else
                     {
                         slaveHaURI = resultingSlaveHaURI;
+                        canAskForElections.set( true );
                     }
                 }
                 catch ( UnableToCopyStoreFromOldMasterException | InconsistentlyUpgradedClusterException |
@@ -358,7 +372,7 @@ public class HighAvailabilityModeSwitcher implements HighAvailabilityMemberListe
 
     private void switchToPending()
     {
-        msgLog.logMessage( "I am " + getServerId( me ) + ", moving to pending" );
+        msgLog.logMessage( "I am " + instanceId + ", moving to pending" );
 
         startModeSwitching( new Runnable()
         {
@@ -408,6 +422,11 @@ public class HighAvailabilityModeSwitcher implements HighAvailabilityMemberListe
     private StoreId resolveStoreId()
     {
         return dependencyResolver.resolveDependency( StoreId.class );
+    }
+
+    ScheduledExecutorService createExecutor()
+    {
+        return Executors.newSingleThreadScheduledExecutor( named( "HA Mode switcher" ) );
     }
 
     private static class CancellationHandle implements CancellationRequest

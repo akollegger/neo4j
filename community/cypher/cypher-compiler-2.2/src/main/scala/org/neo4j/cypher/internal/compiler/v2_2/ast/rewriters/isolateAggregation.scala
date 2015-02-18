@@ -21,7 +21,7 @@ package org.neo4j.cypher.internal.compiler.v2_2.ast.rewriters
 
 import org.neo4j.cypher.internal.compiler.v2_2.ast._
 import org.neo4j.cypher.internal.compiler.v2_2.helpers.AggregationNameGenerator
-import org.neo4j.cypher.internal.compiler.v2_2.{Rewriter, bottomUp}
+import org.neo4j.cypher.internal.compiler.v2_2.{replace, Rewriter, bottomUp}
 import org.neo4j.cypher.internal.helpers.Converge.iterateUntilConverged
 
 /**
@@ -41,15 +41,19 @@ import org.neo4j.cypher.internal.helpers.Converge.iterateUntilConverged
  * RETURN { name: x1, count: x2 }
  */
 case object isolateAggregation extends Rewriter {
-  def apply(in: AnyRef): AnyRef = bottomUp(instance).apply(in)
+  def apply(that: AnyRef): AnyRef = instance(that)
 
-  private val instance = Rewriter.lift {
+  private val instance = replace(replacer => {
+
+    case expr: Expression =>
+      replacer.stop(expr)
+
     case q@SingleQuery(clauses) =>
 
       val newClauses = clauses.flatMap {
-        case c if !clauseNeedingWork(c) => Some(c)
-        case c =>
-          val originalExpressions = getExpressions(c)
+        case clause if !clauseNeedingWork(clause) => Some(clause)
+        case clause =>
+          val originalExpressions = getExpressions(clause)
 
           val expressionsToGoToWith: Seq[Expression] = iterateUntilConverged {
             (expressions: Seq[Expression]) => expressions.flatMap {
@@ -74,19 +78,12 @@ case object isolateAggregation extends Rewriter {
 
           val withReturnItems: Seq[ReturnItem] = expressionsToGoToWith.map {
             case id: Identifier => AliasedReturnItem(id.copyId, id.copyId)(id.position)
-            case e              => AliasedReturnItem(e, Identifier(AggregationNameGenerator.name(e.position.offset))(e.position))(e.position)
+            case e              => AliasedReturnItem(e, Identifier(AggregationNameGenerator.name(e.position))(e.position))(e.position)
           }
-          val pos = c.position
+          val pos = clause.position
           val withClause = With(distinct = false, ReturnItems(includeExisting = false, withReturnItems)(pos), None, None, None, None)(pos)
 
-          val resultClause = c.endoRewrite(bottomUp(Rewriter.lift {
-            case unalteredItem@UnaliasedReturnItem(id:Identifier, _) if originalExpressions.contains(id) =>
-              unalteredItem
-
-            case ri: UnaliasedReturnItem =>
-
-              AliasedReturnItem(ri.expression, Identifier(ri.inputText)(ri.position))(ri.position)
-
+          val resultClause = clause.endoRewrite(bottomUp(Rewriter.lift {
             case e: Expression =>
               withReturnItems.collectFirst {
                 case AliasedReturnItem(expression, identifier) if e == expression => identifier.copyId
@@ -97,7 +94,10 @@ case object isolateAggregation extends Rewriter {
       }
 
       q.copy(clauses = newClauses)(q.position)
-  }
+
+    case astNode =>
+      replacer.expand(astNode)
+  })
 
   private def getExpressions(c: Clause): Seq[Expression] = c match {
     case clause: Return => clause.returnItems.items.map(_.expression)
@@ -107,10 +107,5 @@ case object isolateAggregation extends Rewriter {
 
   private def clauseNeedingWork(c: Clause): Boolean = c.exists {
     case e: Expression => hasAggregateButIsNotAggregate(e)
-  }
-
-  private def hasAggregateButIsNotAggregate(e: Expression): Boolean = e match {
-    case IsAggregate(_) => false
-    case e: Expression  => containsAggregate(e)
   }
 }

@@ -25,8 +25,6 @@ import org.neo4j.cypher.internal.compiler.v2_2.symbols._
 
 case class Identifier(name: String)(val position: InputPosition) extends Expression {
 
-  def renamed(newName: String) = copy(name = newName)(position)
-
   def toSymbolUse = SymbolUse(name, position)
 
   // check the identifier is defined and, if not, define it so that later errors are suppressed
@@ -50,7 +48,9 @@ case class Identifier(name: String)(val position: InputPosition) extends Express
 
   def copyId = copy()(position)
 
-  def bumpId = copy()(position.copy(offset = position.offset + 1)) // TODO: HACKISHHHH
+  def renameId(newName: String) = copy(name = newName)(position)
+
+  def bumpId = copy()(position.bumped())
 }
 
 object Identifier {

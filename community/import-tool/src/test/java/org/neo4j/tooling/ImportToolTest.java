@@ -19,17 +19,16 @@
  */
 package org.neo4j.tooling;
 
+import org.junit.Rule;
+import org.junit.Test;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Random;
 import java.util.UUID;
-
-import org.junit.Rule;
-import org.junit.Test;
 
 import org.neo4j.function.primitive.PrimitiveIntPredicate;
 import org.neo4j.graphdb.GraphDatabaseService;
@@ -42,17 +41,22 @@ import org.neo4j.helpers.Triplet;
 import org.neo4j.helpers.collection.PrefetchingIterator;
 import org.neo4j.kernel.impl.util.Validator;
 import org.neo4j.kernel.impl.util.Validators;
+import org.neo4j.test.Mute;
+import org.neo4j.test.RandomRule;
 import org.neo4j.test.TargetDirectory;
 import org.neo4j.test.TargetDirectory.TestDirectory;
 import org.neo4j.unsafe.impl.batchimport.input.csv.Configuration;
 import org.neo4j.unsafe.impl.batchimport.input.csv.Type;
 
-import static java.lang.System.currentTimeMillis;
-import static java.util.Arrays.asList;
-
+import static org.hamcrest.CoreMatchers.containsString;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import static java.lang.System.currentTimeMillis;
+import static java.util.Arrays.asList;
 
 import static org.neo4j.collection.primitive.PrimitiveIntCollections.alwaysTrue;
 import static org.neo4j.graphdb.DynamicLabel.label;
@@ -117,8 +121,8 @@ public class ImportToolTest
                     nodeData( false, config, nodeIds, lines( 0, NODE_COUNT/2 ) ).getAbsolutePath(),
                 "--nodes", // One group with two data files, where the header sits in the first file
                     nodeData( true, config, nodeIds,
-                              lines( NODE_COUNT/2, NODE_COUNT*3/4 ) ).getAbsolutePath() + MULTI_FILE_DELIMITER +
-                    nodeData( false, config, nodeIds, lines( NODE_COUNT*3/4, NODE_COUNT ) ).getAbsolutePath(),
+                            lines( NODE_COUNT / 2, NODE_COUNT * 3 / 4 ) ).getAbsolutePath() + MULTI_FILE_DELIMITER +
+                    nodeData( false, config, nodeIds, lines( NODE_COUNT * 3 / 4, NODE_COUNT ) ).getAbsolutePath(),
                 "--relationships",
                     relationshipHeader( config ).getAbsolutePath() + MULTI_FILE_DELIMITER +
                     relationshipData( false, config, nodeIds, alwaysTrue() ).getAbsolutePath() ) );
@@ -233,16 +237,18 @@ public class ImportToolTest
         String groupTwo = "Movie";
 
         // WHEN
-        ImportTool.main( arguments(
-                "--into",          directory.absolutePath(),
-                "--nodes",         nodeHeader( config, groupOne ) + MULTI_FILE_DELIMITER +
-                                   nodeData( false, config, groupOneNodeIds, alwaysTrue() ),
-                "--nodes",         nodeHeader( config, groupTwo ) + MULTI_FILE_DELIMITER +
-                                   nodeData( false, config, groupTwoNodeIds, alwaysTrue() ),
-                "--relationships", relationshipHeader( config, groupOne, groupTwo ) + MULTI_FILE_DELIMITER +
+        String[] args = arguments(
+                "--into", directory.absolutePath(),
+                "--nodes", nodeHeader( config, groupOne ) + MULTI_FILE_DELIMITER +
+                           nodeData( false, config, groupOneNodeIds, alwaysTrue() ),
+                "--nodes", nodeHeader( config, groupTwo ) + MULTI_FILE_DELIMITER +
+                           nodeData( false, config, groupTwoNodeIds, alwaysTrue() ),
+                "--relationships", relationshipHeader( config, groupOne, groupTwo, true ) + MULTI_FILE_DELIMITER +
                                    relationshipData( false, config, rels.iterator(), alwaysTrue(), true )
 
-                ) );
+        );
+
+        ImportTool.main( args );
 
         // THEN
         GraphDatabaseService db = new GraphDatabaseFactory().newEmbeddedDatabase( directory.absolutePath() );
@@ -283,10 +289,59 @@ public class ImportToolTest
                     nodeData( false, config, groupTwoNodeIds, alwaysTrue() )
 
                     ) );
+            fail( "Should have failed" );
         }
         catch ( Exception e )
         {
             assertTrue( Exceptions.contains( e, "Mixing specified", IllegalStateException.class ) );
+        }
+    }
+
+    @Test
+    public void shouldImportWithoutTypeSpecifiedInRelationshipHeaderbutWithDefaultTypeInArgument() throws Exception
+    {
+        // GIVEN
+        List<String> nodeIds = nodeIds();
+        Configuration config = Configuration.COMMAS;
+        String type = randomType();
+
+        // WHEN
+        ImportTool.main( arguments(
+                "--into",          directory.absolutePath(),
+                "--nodes",         nodeData( true, config, nodeIds, alwaysTrue() ).getAbsolutePath(),
+                                   // there will be no :TYPE specified in the header of the relationships below
+                "--relationships:" + type,
+                                   relationshipData( true, config, nodeIds, alwaysTrue(), false ).getAbsolutePath() ) );
+
+        // THEN
+        verifyData();
+    }
+
+    @Test
+    public void shouldIncludeSourceInformationInNodeIdCollisionError() throws Exception
+    {
+        // GIVEN
+        List<String> nodeIds = asList( "a", "b", "c", "d", "e", "f", "a", "g" );
+        Configuration config = Configuration.COMMAS;
+        File nodeHeaderFile = nodeHeader( config );
+        File nodeData1 = nodeData( false, config, nodeIds, lines( 0, 4 ) );
+        File nodeData2 = nodeData( false, config, nodeIds, lines( 4, nodeIds.size() ) );
+
+        // WHEN
+        try
+        {
+            ImportTool.main( arguments(
+                    "--into",  directory.absolutePath(),
+                    "--nodes", nodeHeaderFile.getAbsolutePath() + MULTI_FILE_DELIMITER +
+                               nodeData1.getAbsolutePath() + MULTI_FILE_DELIMITER +
+                               nodeData2.getAbsolutePath() ) );
+            fail( "Should have failed with duplicate node IDs" );
+        }
+        catch ( Exception e )
+        {
+            // THEN
+            assertThat( e.getMessage(), containsString( nodeData1.getPath() + ":" + 1 ) );
+            assertThat( e.getMessage(), containsString( nodeData2.getPath() + ":" + 3 ) );
         }
     }
 
@@ -457,7 +512,7 @@ public class ImportToolTest
         {
             if ( includeHeader )
             {
-                writeRelationshipHeader( writer, config, null, null );
+                writeRelationshipHeader( writer, config, null, null, specifyType );
             }
             writeRelationshipData( writer, config, data, linePredicate, specifyType );
         }
@@ -466,16 +521,16 @@ public class ImportToolTest
 
     private File relationshipHeader( Configuration config ) throws FileNotFoundException
     {
-        return relationshipHeader( config, null, null );
+        return relationshipHeader( config, null, null, true );
     }
 
-    private File relationshipHeader( Configuration config, String startIdGroup, String endIdGroup )
+    private File relationshipHeader( Configuration config, String startIdGroup, String endIdGroup, boolean specifyType )
             throws FileNotFoundException
     {
         File file = directory.file( fileName( "relationships-header.csv" ) );
         try ( PrintStream writer = new PrintStream( file ) )
         {
-            writeRelationshipHeader( writer, config, startIdGroup, endIdGroup );
+            writeRelationshipHeader( writer, config, startIdGroup, endIdGroup, specifyType );
         }
         return file;
     }
@@ -486,13 +541,14 @@ public class ImportToolTest
     }
 
     private void writeRelationshipHeader( PrintStream writer, Configuration config,
-            String startIdGroup, String endIdGroup )
+            String startIdGroup, String endIdGroup, boolean specifyType )
     {
         char delimiter = config.delimiter();
         writer.println(
                 idEntry( null, Type.START_ID, startIdGroup ) + delimiter +
-                idEntry( null, Type.END_ID, endIdGroup ) + delimiter +
-                ":" + Type.TYPE + delimiter + "created:long" );
+                idEntry( null, Type.END_ID, endIdGroup ) +
+                (specifyType ? (delimiter + ":" + Type.TYPE) : "") +
+                delimiter + "created:long" );
     }
 
     private void writeRelationshipData( PrintStream writer, Configuration config,
@@ -508,11 +564,10 @@ public class ImportToolTest
                     break;
                 }
                 Triplet<String,String,String> entry = data.next();
-                writer.println(
-                        entry.first() + delimiter +
-                        entry.second() + delimiter +
-                        (specifyType ? entry.third() : "") + delimiter +
-                        currentTimeMillis() );
+                writer.println( entry.first() +
+                        delimiter + entry.second() +
+                        (specifyType ? (delimiter + entry.third()) : "") +
+                        delimiter + currentTimeMillis() );
             }
         }
     }
@@ -558,6 +613,7 @@ public class ImportToolTest
     private static final int NODE_COUNT = 100;
 
     public final @Rule TestDirectory directory = TargetDirectory.testDirForTest( getClass() );
-    private final Random random = new Random();
+    public final @Rule RandomRule random = new RandomRule();
+    public final @Rule Mute mute = Mute.mute( Mute.System.values() );
     private int dataIndex;
 }

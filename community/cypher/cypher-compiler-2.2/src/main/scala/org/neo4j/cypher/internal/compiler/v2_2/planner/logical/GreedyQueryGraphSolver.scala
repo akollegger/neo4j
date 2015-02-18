@@ -34,10 +34,11 @@ class GreedyQueryGraphSolver(planCombiner: CandidateGenerator[PlanTable],
   import org.neo4j.cypher.internal.compiler.v2_2.planner.logical.CandidateGenerator._
 
     val select = config.applySelections.asFunctionInContext
+    val projectAllEndpoints = config.projectAllEndpoints.asFunctionInContext
     val pickBest = config.pickBestCandidate.asFunctionInContext
 
     def generateLeafPlanTable(): PlanTable = {
-      val leafPlanCandidateLists = config.leafPlanners.candidates(queryGraph)
+      val leafPlanCandidateLists = config.leafPlanners.candidates(queryGraph, projectAllEndpoints)
       val leafPlanCandidateListsWithSelections = leafPlanCandidateLists.map(_.map(select(_, queryGraph)))
       val bestLeafPlans: Iterable[LogicalPlan] = leafPlanCandidateListsWithSelections.flatMap(pickBest(_))
       val startTable: PlanTable = leafPlan.foldLeft(emptyPlanTable)(_ + _)
@@ -58,7 +59,7 @@ class GreedyQueryGraphSolver(planCombiner: CandidateGenerator[PlanTable],
           val candidatesPerIds: Map[Set[IdName], Seq[LogicalPlan]] =
             selected.foldLeft(Map.empty[Set[IdName], Seq[LogicalPlan]]) {
               case (acc, plan) =>
-                val ids = plan.availableSymbols.filterNot(idName => idName.name.endsWith("$$$_") || idName.name.endsWith("$$$"))
+                val ids = plan.availableSymbols
                 val candidates = acc.getOrElse(ids, Seq.empty) :+ plan
                 acc + (ids -> candidates)
             }
@@ -83,7 +84,7 @@ class GreedyQueryGraphSolver(planCombiner: CandidateGenerator[PlanTable],
     val leaves: PlanTable = generateLeafPlanTable()
     val afterCombiningPlans = iterateUntilConverged(findBestPlan(planCombiner))(leaves)
 
-    if (stillHasOverlappingPlans(afterCombiningPlans))
+    if (stillHasOverlappingPlans(afterCombiningPlans, leafPlan.map(_.availableSymbols).getOrElse(Set.empty)))
       None
     else {
       val afterCartesianProduct = iterateUntilConverged(solveOptionalAndCartesianProducts)(afterCombiningPlans)
@@ -91,10 +92,12 @@ class GreedyQueryGraphSolver(planCombiner: CandidateGenerator[PlanTable],
     }
   }
 
-  private def stillHasOverlappingPlans(afterCombiningPlans: PlanTable): Boolean =
+  private def stillHasOverlappingPlans(afterCombiningPlans: PlanTable, arguments: Set[IdName]): Boolean =
     afterCombiningPlans.plans.exists {
       p1 => afterCombiningPlans.plans.exists {
-        p2 => p1 != p2 && p1.availableSymbols.intersect(p2.availableSymbols).nonEmpty
+        p2 =>
+          val overlap = (p1.availableSymbols intersect p2.availableSymbols) -- arguments
+          p1 != p2 && overlap.nonEmpty
       }
     }
 }

@@ -23,25 +23,31 @@ import java.io.IOException;
 import java.util.Arrays;
 
 import org.neo4j.csv.reader.CharSeeker;
+import org.neo4j.csv.reader.Extractors;
 import org.neo4j.csv.reader.Mark;
 import org.neo4j.function.Function;
-import org.neo4j.helpers.collection.PrefetchingResourceIterator;
+import org.neo4j.helpers.Exceptions;
+import org.neo4j.helpers.collection.PrefetchingIterator;
+import org.neo4j.unsafe.impl.batchimport.InputIterator;
+import org.neo4j.unsafe.impl.batchimport.input.DataException;
 import org.neo4j.unsafe.impl.batchimport.input.InputEntity;
 import org.neo4j.unsafe.impl.batchimport.input.InputException;
 import org.neo4j.unsafe.impl.batchimport.input.UnexpectedEndOfInputException;
 
+import static java.lang.String.format;
 import static java.util.Arrays.copyOf;
 
 /**
  * Converts a line of csv data into an {@link InputEntity} (either a node or relationship).
  * Does so by seeking values, using {@link CharSeeker}, interpreting the values using a {@link Header}.
  */
-abstract class InputEntityDeserializer<ENTITY extends InputEntity> extends PrefetchingResourceIterator<ENTITY>
+abstract class InputEntityDeserializer<ENTITY extends InputEntity> extends PrefetchingIterator<ENTITY>
+        implements InputIterator<ENTITY>
 {
-    private final Header header;
+    protected final Header header;
     private final CharSeeker data;
     private final Mark mark = new Mark();
-    private final int[] delimiter;
+    private final int delimiter;
     private final Function<ENTITY,ENTITY> decorator;
 
     // Data
@@ -49,7 +55,7 @@ abstract class InputEntityDeserializer<ENTITY extends InputEntity> extends Prefe
     private Object[] properties = new Object[10*2];
     private int propertiesCursor;
 
-    InputEntityDeserializer( Header header, CharSeeker data, int[] delimiter, Function<ENTITY,ENTITY> decorator )
+    InputEntityDeserializer( Header header, CharSeeker data, int delimiter, Function<ENTITY,ENTITY> decorator )
     {
         this.header = header;
         this.data = data;
@@ -61,15 +67,16 @@ abstract class InputEntityDeserializer<ENTITY extends InputEntity> extends Prefe
     protected ENTITY fetchNextOrNull()
     {
         // Read a CSV "line" and convert the values into what they semantically mean.
+        int fieldIndex = 0;
+        Header.Entry[] entries = header.entries();
         try
         {
-            Header.Entry[] entries = header.entries();
-            for ( int i = 0; i < entries.length; i++ )
+            for ( ; fieldIndex < entries.length; fieldIndex++ )
             {
                 // Seek the next value
                 if ( !data.seek( mark, delimiter ) )
                 {
-                    if ( i > 0 )
+                    if ( fieldIndex > 0 )
                     {
                         throw new UnexpectedEndOfInputException( "Near " + mark );
                     }
@@ -78,7 +85,7 @@ abstract class InputEntityDeserializer<ENTITY extends InputEntity> extends Prefe
                 }
 
                 // Extract it, type according to our header
-                Header.Entry entry = entries[i];
+                Header.Entry entry = entries[fieldIndex];
                 Object value = data.tryExtract( mark, entry.extractor() )
                         ? entry.extractor().value() : null;
                 boolean handled = true;
@@ -117,16 +124,56 @@ abstract class InputEntityDeserializer<ENTITY extends InputEntity> extends Prefe
                 data.seek( mark, delimiter );
             }
 
-            return decorator.apply( entity );
+            entity = decorator.apply( entity );
+            validate( entity );
+            return entity;
         }
         catch ( IOException e )
         {
             throw new InputException( "Unable to read more data from input stream", e );
         }
+        catch ( final RuntimeException e )
+        {
+            String stringValue = null;
+            try
+            {
+                Extractors extractors = new Extractors( '?' );
+                if ( data.tryExtract( mark, extractors.string() ) )
+                {
+                    stringValue = extractors.string().value();
+                }
+            }
+            catch ( Exception e1 )
+            {   // OK
+            }
+
+            String message = format( "ERROR in input" +
+                    "%n  data source: %s" +
+                    "%n  in field: %s" +
+                    "%n  for header: %s" +
+                    "%n  raw field value: %s" +
+                    "%n  original error: %s",
+                    data, entries[fieldIndex] + ":" + (fieldIndex+1), header,
+                    stringValue != null ? stringValue : "??",
+                    e.getMessage() );
+            if ( e instanceof InputException )
+            {
+                throw Exceptions.withMessage( e, message );
+            }
+            throw new InputException( message, e );
+        }
         finally
         {
             propertiesCursor = 0;
         }
+    }
+
+    /**
+     * Called after the entity has been fully populated.
+     * @throws DataException on validation error.
+     */
+    protected void validate( ENTITY entity )
+    {   // No default validation
     }
 
     protected void addProperty( Header.Entry entry, Object value )
@@ -171,4 +218,16 @@ abstract class InputEntityDeserializer<ENTITY extends InputEntity> extends Prefe
     protected abstract ENTITY convertToInputEntity( Object[] properties );
 
     protected abstract void handleValue( Header.Entry entry, Object value );
+
+    @Override
+    public long position()
+    {
+        return data.position();
+    }
+
+    @Override
+    public String toString()
+    {
+        return data.toString();
+    }
 }

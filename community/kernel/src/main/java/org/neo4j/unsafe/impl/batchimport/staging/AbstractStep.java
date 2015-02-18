@@ -45,6 +45,7 @@ public abstract class AbstractStep<T> implements Step<T>
     private volatile boolean endOfUpstream;
     private volatile Throwable panic;
     private volatile boolean completed;
+    protected boolean orderedTickets;
     protected final PrimitiveLongPredicate rightTicket = new PrimitiveLongPredicate()
     {
         @Override
@@ -66,6 +67,7 @@ public abstract class AbstractStep<T> implements Step<T>
     protected final AtomicLong doneBatches = new AtomicLong();
     // Milliseconds spent processing all received batches.
     protected final MovingAverage totalProcessingTime;
+    protected long startTime, endTime;
 
     public AbstractStep( StageControl control, String name, int movingAverageSize )
     {
@@ -75,8 +77,10 @@ public abstract class AbstractStep<T> implements Step<T>
     }
 
     @Override
-    public void start()
-    {   // Do nothing by default
+    public void start( boolean orderedTickets )
+    {
+        this.orderedTickets = orderedTickets;   // Do nothing by default
+        startTime = currentTimeMillis();
     }
 
     /**
@@ -234,11 +238,11 @@ public abstract class AbstractStep<T> implements Step<T>
     {
         if ( !stillWorking() && !isCompleted() )
         {
-            done();
             if ( downstream != null )
             {
                 downstream.endOfUpstream();
             }
+            done();
             // else this is the end of the line
             completed = true;
         }
@@ -250,6 +254,7 @@ public abstract class AbstractStep<T> implements Step<T>
      */
     protected void done()
     {   // Do nothing by default
+        endTime = currentTimeMillis();
     }
 
     @Override

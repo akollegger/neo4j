@@ -57,11 +57,11 @@ public interface CharSeeker extends Closeable
      * or even end-of-file.
      *
      * @param mark the mutable {@link Mark} which will be updated with the findings, if any.
-     * @param untilOneOfChars array of characters to seek.
+     * @param untilChar array of characters to seek.
      * @return {@code false} if the end was reached and hence no value found, otherwise {@code true}.
      * @throws IOException in case of I/O error.
      */
-    boolean seek( Mark mark, int[] untilOneOfChars ) throws IOException;
+    boolean seek( Mark mark, int untilChar ) throws IOException;
 
     /**
      * Extracts the value specified by the {@link Mark}, previously populated by a call to {@link #seek(Mark, int[])}.
@@ -83,10 +83,15 @@ public interface CharSeeker extends Closeable
      */
     boolean tryExtract( Mark mark, Extractor<?> extractor );
 
+    /**
+     * @return a low-level byte-like position of f.ex. total number of read bytes.
+     */
+    long position();
+
     public static final CharSeeker EMPTY = new CharSeeker()
     {
         @Override
-        public boolean seek( Mark mark, int[] untilOneOfChars )
+        public boolean seek( Mark mark, int untilChar )
         {
             return false;
         }
@@ -106,6 +111,12 @@ public interface CharSeeker extends Closeable
         @Override
         public void close()
         {   // Nothing to close
+        }
+
+        @Override
+        public long position()
+        {
+            return 0;
         }
     };
 }

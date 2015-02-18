@@ -20,15 +20,17 @@
 package org.neo4j.cypher.internal.compiler.v2_2.pipes
 
 import org.neo4j.cypher.internal.compiler.v2_2.ExecutionContext
+import org.neo4j.cypher.internal.compiler.v2_2.executionplan.Effects
+import org.neo4j.cypher.internal.compiler.v2_2.executionplan.Effects._
 import org.neo4j.cypher.internal.compiler.v2_2.planDescription.{InternalPlanDescription, NoChildren, PlanDescriptionImpl}
 import org.neo4j.cypher.internal.compiler.v2_2.symbols.{SymbolTable, SymbolTypeAssertionCompiler, _}
 
 case class ArgumentPipe(symbols: SymbolTable)
-                       (val estimatedCardinality: Option[Long] = None)
+                       (val estimatedCardinality: Option[Double] = None)
                        (implicit val monitor: PipeMonitor) extends Pipe with RonjaPipe {
   def sources = Seq.empty
 
-  def withEstimatedCardinality(estimated: Long): Pipe with RonjaPipe = copy()(Some(estimated))
+  def withEstimatedCardinality(estimated: Double): Pipe with RonjaPipe = copy()(Some(estimated))
 
   def planDescription: InternalPlanDescription =
     new PlanDescriptionImpl(this, "Argument", NoChildren, Seq.empty, identifiers)
@@ -41,8 +43,14 @@ case class ArgumentPipe(symbols: SymbolTable)
   def internalCreateResults(state: QueryState): Iterator[ExecutionContext] =
     Iterator(typeAssertions(state.initialContext.get))
 
-
   def dup(sources: List[Pipe]): Pipe = this
 
   def exists(pred: (Pipe) => Boolean) = pred(this)
+
+  override def localEffects: Effects =
+    symbols.identifiers.values.foldLeft(NONE) {
+      case (acc, _: NodeType)         => acc | READS_NODES
+      case (acc, _: RelationshipType) => acc | READS_RELATIONSHIPS
+      case (acc, _)                   => acc
+    }
 }

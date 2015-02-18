@@ -1,5 +1,5 @@
 ###!
-Copyright (c) 2002-2014 "Neo Technology,"
+Copyright (c) 2002-2015 "Neo Technology,"
 Network Engine for Objects in Lund AB [http://neotechnology.com]
 
 This file is part of Neo4j.
@@ -32,7 +32,8 @@ angular.module('neo4jApp.controllers')
     'GraphStyle'
     'Utils'
     'Settings'
-    ($scope, $timeout, $modal, Editor, Frame, GraphStyle, Utils, Settings) ->
+    'Intercom'
+    ($scope, $timeout, $modal, Editor, Frame, GraphStyle, Utils, Settings, Intercom) ->
       $scope.settings = Settings
       _codeMirror = null
       dialog = null
@@ -43,6 +44,14 @@ angular.module('neo4jApp.controllers')
         dialogFade: yes
         keyboard: yes
         size: 'lg'
+
+      $scope.toggleMessenger = () ->
+        Intercom.toggle()
+
+      $scope.suggestionPlaceholder = 'I want to X, tried Y, suggest Z'
+
+      $scope.newMessage = (suggestion) ->
+        Intercom.newMessage(suggestion)
 
       $scope.showDoc = () ->
         Frame.create(input: ':play')

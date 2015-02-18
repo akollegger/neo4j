@@ -20,19 +20,25 @@
 package org.neo4j.cypher.internal.compiler.v2_2.pipes
 
 import org.neo4j.cypher.internal.compiler.v2_2.ExecutionContext
+import org.neo4j.cypher.internal.compiler.v2_2.executionplan.Effects
 import org.neo4j.cypher.internal.compiler.v2_2.planDescription.InternalPlanDescription.Arguments.KeyNames
 import org.neo4j.cypher.internal.compiler.v2_2.spi.QueryContext
 import org.neo4j.cypher.internal.compiler.v2_2.symbols._
 import org.neo4j.cypher.internal.helpers.CollectionSupport
 import org.neo4j.graphdb.{Node, Relationship}
 
-case class ProjectEndpointsPipe(source: Pipe, relName: String, start: String, end: String, directed: Boolean = true, simpleLength: Boolean = true)
-                               (val estimatedCardinality: Option[Long] = None)(implicit pipeMonitor: PipeMonitor)
+case class ProjectEndpointsPipe(source: Pipe, relName: String,
+                                start: String, startInScope: Boolean,
+                                end: String, endInScope: Boolean,
+                                relTypes: Option[LazyTypes], directed: Boolean, simpleLength: Boolean)
+                               (val estimatedCardinality: Option[Double] = None)(implicit pipeMonitor: PipeMonitor)
   extends PipeWithSource(source, pipeMonitor)
   with CollectionSupport
   with RonjaPipe {
   val symbols: SymbolTable =
     source.symbols.add(start, CTNode).add(end, CTNode)
+
+  override val localEffects = if (!startInScope || !endInScope) Effects.READS_NODES else Effects.NONE
 
   type Projector = (ExecutionContext) => Iterator[ExecutionContext]
 
@@ -48,67 +54,65 @@ case class ProjectEndpointsPipe(source: Pipe, relName: String, start: String, en
     copy(source = source)(estimatedCardinality)
   }
 
-  def withEstimatedCardinality(estimated: Long) = copy()(Some(estimated))
+  def withEstimatedCardinality(estimated: Double) = copy()(Some(estimated))
 
   private def projector(qtx: QueryContext): Projector =
-    if (directed)
-      if (simpleLength) projectDirected(qtx) else projectDirectedVarLength(qtx)
-    else
-      if (simpleLength) projectUndirected(qtx) else projectUndirectedVarLength(qtx)
+    if (simpleLength) project(qtx) else projectVarLength(qtx)
 
-  private def projectDirectedVarLength(qtx: QueryContext): Projector = (context: ExecutionContext) => {
-    val rels = findVarLengthRels(context, qtx)
-    if (rels.isEmpty)
-      Iterator.empty
-    else {
-      val (startNode, endNode) = findVarLengthRelEndpoints(rels, qtx)
-      Iterator(
-        context.newWith2(start, startNode, end, endNode)
-      )
+  private def projectVarLength(qtx: QueryContext): Projector = (context: ExecutionContext) => {
+    findVarLengthRelEndpoints(context, qtx) match {
+      case Some((startNode, endNode, _)) if directed =>
+        Iterator(
+          context.newWith2(start, startNode, end, endNode)
+        )
+      case Some((startNode, endNode, rels)) if !directed =>
+        Iterator(
+          context.newWith2(start, startNode, end, endNode),
+          context.newWith3(start, endNode, end, startNode, relName, rels.reverse)
+        )
+      case None =>
+        Iterator.empty
     }
   }
 
-  private def projectUndirectedVarLength(qtx: QueryContext): Projector = (context: ExecutionContext) => {
-    val rels = findVarLengthRels(context, qtx)
-    if (rels.isEmpty)
-      Iterator.empty
-    else {
-      val (startNode, endNode) = findVarLengthRelEndpoints(rels, qtx)
-      Iterator(
-        context.newWith2(start, startNode, end, endNode),
-        context.newWith3(start, endNode, end, startNode, relName, rels.reverse)
-      )
+  private def project(qtx: QueryContext): Projector = (context: ExecutionContext) => {
+    findSimpleLengthRelEndpoints(context, qtx) match {
+      case Some((startNode, endNode)) if directed =>
+        Iterator(context.newWith2(start, startNode, end, endNode))
+      case Some((startNode, endNode)) if !directed =>
+        Iterator(
+          context.newWith2(start, startNode, end, endNode),
+          context.newWith2(start, endNode, end, startNode)
+        )
+      case None =>
+        Iterator.empty
     }
   }
 
-  private def projectDirected(qtx: QueryContext): Projector = (context: ExecutionContext) => {
-    val (startNode, endNode) = findSimpleLengthRelEndpoints(context, qtx)
-    Iterator(
-      context.newWith2(start, startNode, end, endNode)
-    )
+  private def findSimpleLengthRelEndpoints(context: ExecutionContext, qtx: QueryContext): Option[(Node, Node)] = {
+    val rel = Some(context(relName).asInstanceOf[Relationship]).filter(hasAllowedType)
+    rel.flatMap { rel => pickStartAndEnd(rel, rel, context, qtx)}
   }
 
-  private def projectUndirected(qtx: QueryContext): Projector = (context: ExecutionContext) => {
-    val (startNode, endNode) = findSimpleLengthRelEndpoints(context, qtx)
-    Iterator(
-      context.newWith2(start, startNode, end, endNode),
-      context.newWith2(start, endNode, end, startNode)
-    )
+  private def findVarLengthRelEndpoints(context: ExecutionContext, qtx: QueryContext): Option[(Node, Node, Seq[Relationship])] = {
+    val rels = makeTraversable(context(relName)).toSeq.asInstanceOf[Seq[Relationship]]
+    if (rels.nonEmpty && rels.forall(hasAllowedType)) {
+      pickStartAndEnd(rels.head, rels.last, context, qtx).map { case (s, e) => (s, e, rels) }
+    } else {
+      None
+    }
   }
 
-  private def findSimpleLengthRelEndpoints(context: ExecutionContext, qtx: QueryContext): (Node, Node) = {
-    val rel = context(relName).asInstanceOf[Relationship]
-    val startNode = qtx.relationshipStartNode(rel)
-    val endNode = qtx.relationshipEndNode(rel)
-    (startNode, endNode)
-  }
+  private def hasAllowedType(rel: Relationship): Boolean =
+    relTypes.map(_.names.contains(rel.getType.name())).getOrElse(true)
 
-  private def findVarLengthRels(context: ExecutionContext, qtx: QueryContext): Seq[Relationship] =
-    makeTraversable(context(relName)).toSeq.asInstanceOf[Seq[Relationship]]
-
-  private def findVarLengthRelEndpoints(rels: Seq[Relationship], qtx: QueryContext): (Node, Node) = {
-    val startNode = qtx.relationshipStartNode(rels.head)
-    val endNode = qtx.relationshipEndNode(rels.last)
-    (startNode, endNode)
+  private def pickStartAndEnd(relStart: Relationship, relEnd: Relationship,
+                              context: ExecutionContext, qtx: QueryContext): Option[(Node, Node)] = {
+    val startNode = qtx.relationshipStartNode(relStart)
+    val endNode = qtx.relationshipEndNode(relEnd)
+    Some((startNode, endNode)).filter {
+      case (s, e) =>
+        (!startInScope || context(start) == s) && (!endInScope || context(end) == e)
+    }
   }
 }

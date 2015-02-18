@@ -1,5 +1,5 @@
 ###!
-Copyright (c) 2002-2014 "Neo Technology,"
+Copyright (c) 2002-2015 "Neo Technology,"
 Network Engine for Objects in Lund AB [http://neotechnology.com]
 
 This file is part of Neo4j.
@@ -268,15 +268,15 @@ angular.module('neo4jApp')
       matches:  (input) ->
         pattern = new RegExp("^#{cmdchar}server status")
         input.match(pattern)
-      exec: ['AuthService', (AuthService) ->
+      exec: ['AuthService', 'ConnectionStatusService', (AuthService, ConnectionStatusService) ->
         (input, q) ->
-          AuthService.getAuthInfo()
+          AuthService.hasValidAuthorization()
           .then(
             (r) ->
-              q.resolve(r)
+              q.resolve(ConnectionStatusService.getConnectionStatusSummary())
             ,
             (r) ->
-              q.reject(r)
+              q.reject(ConnectionStatusService.getConnectionStatusSummary())
             )
           q.promise
       ]
@@ -293,35 +293,6 @@ angular.module('neo4jApp')
           q.resolve()
           q.promise
       ]
-
-    FrameProvider.interpreters.push
-      type: 'auth'
-      fullscreenable: false
-      templateUrl: 'views/frame-invalidate-token.html'
-      matches:  (input) ->
-        pattern = new RegExp("^#{cmdchar}server invalidate-token")
-        input.match(pattern)
-      exec: ['AuthService', (AuthService) ->
-        (input, q) ->
-          q.resolve()
-          q.promise
-      ]
-
-    FrameProvider.interpreters.push
-      type: 'auth'
-      fullscreenable: false
-      templateUrl: 'views/frame-set-token.html'
-      matches:  (input) ->
-        pattern = new RegExp("^#{cmdchar}server set-token")
-        input.match(pattern)
-      exec: ['AuthService', (AuthService) ->
-        (input, q) ->
-          q.resolve()
-          q.promise
-      ]
-
-
-
 
 
     # Profile a cypher command

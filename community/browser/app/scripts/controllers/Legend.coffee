@@ -1,5 +1,5 @@
 ###!
-Copyright (c) 2002-2014 "Neo Technology,"
+Copyright (c) 2002-2015 "Neo Technology,"
 Network Engine for Objects in Lund AB [http://neotechnology.com]
 
 This file is part of Neo4j.
@@ -83,6 +83,8 @@ angular.module('neo4jApp')
       #$scope.rules = resultRules
       $scope.labels = stats.labels
       $scope.types = stats.types
+      $scope.$parent.hasLabels = if stats.labels[''] and stats.labels[''].count > 0 then true else false
+      $scope.$parent.hasTypes = if stats.types[''] and stats.types[''].count > 0 then true else false
 
     $scope.$watch 'frame.response', (frameResponse) ->
       return unless frameResponse

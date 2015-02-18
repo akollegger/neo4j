@@ -29,7 +29,6 @@ import java.util.Map.Entry;
 
 import org.neo4j.function.Function;
 import org.neo4j.function.Function2;
-import org.neo4j.function.Functions;
 import org.neo4j.helpers.Args;
 import org.neo4j.helpers.Args.Option;
 import org.neo4j.helpers.collection.IterableWrapper;
@@ -60,6 +59,7 @@ import static org.neo4j.graphdb.factory.GraphDatabaseSettings.store_dir;
 import static org.neo4j.helpers.Exceptions.launderedException;
 import static org.neo4j.helpers.collection.MapUtil.stringMap;
 import static org.neo4j.kernel.impl.util.Converters.withDefault;
+import static org.neo4j.unsafe.impl.batchimport.input.InputEntityDecorators.NO_NODE_DECORATOR;
 import static org.neo4j.unsafe.impl.batchimport.input.InputEntityDecorators.additiveLabels;
 import static org.neo4j.unsafe.impl.batchimport.input.InputEntityDecorators.defaultRelationshipType;
 import static org.neo4j.unsafe.impl.batchimport.input.csv.Configuration.COMMAS;
@@ -77,7 +77,7 @@ public class ImportTool
         STORE_DIR( "into", "<store-dir>", "Database directory to import into. " + "Must not contain existing database." ),
         NODE_DATA(
                 "nodes",
-                "\"<file1>" + MULTI_FILE_DELIMITER + "<file2>" + MULTI_FILE_DELIMITER + "...\"",
+                "[:Label1:Label2] \"<file1>" + MULTI_FILE_DELIMITER + "<file2>" + MULTI_FILE_DELIMITER + "...\"",
                 "Node CSV header and data. Multiple files will be logically seen as one big file "
                         + "from the perspective of the importer. "
                         + "The first line must contain the header. "
@@ -86,18 +86,20 @@ public class ImportTool
                         + "Note that file groups must be enclosed in quotation marks." ),
         RELATIONSHIP_DATA(
                 "relationships",
-                "\"<file1>" + MULTI_FILE_DELIMITER + "<file2>" + MULTI_FILE_DELIMITER + "...\"",
+                "[:RELATIONSHIP_TYPE] \"<file1>" + MULTI_FILE_DELIMITER + "<file2>" +
+                MULTI_FILE_DELIMITER + "...\"",
                 "Relationship CSV header and data. Multiple files will be logically seen as one big file "
                         + "from the perspective of the importer. "
                         + "The first line must contain the header. "
                         + "Multiple data sources like these can be specified in one import, "
                         + "where each data source has its own header. "
                         + "Note that file groups must be enclosed in quotation marks." ),
-        DELIMITER( "delimiter", "<delimiter-character>", "Delimiter character, or 'TAB', between values in CSV data." ),
+        DELIMITER( "delimiter", "<delimiter-character>", "Delimiter character, or 'TAB', between values in CSV data. The default option is `" + COMMAS.delimiter() + "`." ),
         ARRAY_DELIMITER( "array-delimiter", "<array-delimiter-character>",
-                "Delimiter character, or 'TAB', between array elements within a value in CSV data." ),
+                "Delimiter character, or 'TAB', between array elements within a value in CSV data. The default option is `" + COMMAS.arrayDelimiter() + "`." ),
         QUOTE( "quote", "<quotation-character>",
                 "Character to treat as quotation character for values in CSV data. "
+                        + "The default option is `" + COMMAS.quotationCharacter() + "`. "
                         + "Quotes inside quotes escaped like `\"\"\"Go away\"\", he said.\"` and "
                         + "`\"\\\"Go away\\\", he said.\"` are supported. "
                         + "If you have set \"`'`\" to be used as the quotation character, "
@@ -108,7 +110,7 @@ public class ImportTool
                         + "input files are treated.\n"
                         + IdType.STRING + ": arbitrary strings for identifying nodes.\n"
                         + IdType.INTEGER + ": arbitrary integer values for identifying nodes.\n"
-                        + IdType.ACTUAL + ": (advanced) actual node ids." ),
+                        + IdType.ACTUAL + ": (advanced) actual node ids. The default option is `" + IdType.STRING  + "`." ),
         PROCESSORS( "processors", "<max processor count>",
                 "(advanced) Max number of processors used by the importer. Defaults to the number of "
                         + "available processors reported by the JVM"
@@ -190,7 +192,10 @@ public class ImportTool
             enableStacktrace = args.getBoolean( Options.STACKTRACE.key(), Boolean.FALSE, Boolean.TRUE );
             processors = args.getNumber( Options.PROCESSORS.key(), null );
             IdType idType = args.interpretOption( Options.ID_TYPE.key(), withDefault( IdType.STRING ), TO_ID_TYPE );
-            input = input( nodesFiles, relationshipsFiles, INPUT_FILES_EXTRACTOR, idType, csvConfiguration( args ) );
+            input = new CsvInput(
+                    nodeData( nodesFiles ), defaultFormatNodeFileHeader(),
+                    relationshipData( relationshipsFiles ), defaultFormatRelationshipFileHeader(),
+                    idType, csvConfiguration( args ) );
         }
         catch ( IllegalArgumentException e )
         {
@@ -236,19 +241,6 @@ public class ImportTool
                 }
             }
         }
-    }
-
-    private static Input input( Collection<Option<File[]>> nodesFiles, Collection<Option<File[]>> relationshipsFiles,
-            Function2<Args,String,Collection<Option<File[]>>> inputFilesExtractor,
-            IdType idType, Configuration configuration )
-    {
-        Iterable<DataFactory<InputNode>> nodeData = nodeData( nodesFiles );
-        Iterable<DataFactory<InputRelationship>> relationshipData = relationshipData( relationshipsFiles );
-
-        return new CsvInput(
-                nodeData, defaultFormatNodeFileHeader(),
-                relationshipData, defaultFormatRelationshipFileHeader(),
-                idType, configuration );
     }
 
     private static org.neo4j.unsafe.impl.batchimport.Configuration importConfiguration( final Number processors )
@@ -313,7 +305,7 @@ public class ImportTool
             {
                 Function<InputNode,InputNode> decorator = input.metadata() != null
                         ? additiveLabels( input.metadata().split( ":" ) )
-                        : Functions.<InputNode>identity();
+                        : NO_NODE_DECORATOR;
                 return data( decorator, input.value() );
             }
         };
@@ -370,7 +362,7 @@ public class ImportTool
                 args.interpretOption( Options.ARRAY_DELIMITER.key(), Converters.<Character>optional(), DELIMITER_CONVERTER );
         final Character specificQuote =
                 args.interpretOption( Options.QUOTE.key(), Converters.<Character>optional(), Converters.toCharacter() );
-        return new Configuration()
+        return new Configuration.Default()
         {
             @Override
             public char delimiter()

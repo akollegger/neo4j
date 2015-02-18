@@ -1,5 +1,5 @@
 ###!
-Copyright (c) 2002-2014 "Neo Technology,"
+Copyright (c) 2002-2015 "Neo Technology,"
 Network Engine for Objects in Lund AB [http://neotechnology.com]
 
 This file is part of Neo4j.
@@ -30,7 +30,8 @@ angular.module('neo4jApp.controllers')
       'AuthService'
       'Settings'
       'motdService'
-      ($scope, $window, Server, Frame, AuthService, Settings, motdService) ->
+      'UsageDataCollectionService'
+      ($scope, $window, Server, Frame, AuthService, Settings, motdService, UDC) ->
         refresh = ->
           $scope.labels = Server.labels()
           $scope.relationships = Server.relationships()
@@ -48,7 +49,9 @@ angular.module('neo4jApp.controllers')
               for r in response
                 for a in r.attributes
                   $scope.kernel[a.name] = a.value
-          ).error((r)-> $scope.kernel = {})
+              UDC.set('store_id',   $scope.kernel['StoreId'])
+              UDC.set('neo4j_version', $scope.server.neo4j_version)
+            ).error((r)-> $scope.kernel = {})
 
         $scope.identity = angular.identity
 
@@ -71,9 +74,12 @@ angular.module('neo4jApp.controllers')
         $scope.goodBrowser = !/msie/.test(navigator.userAgent.toLowerCase())
 
         $scope.$watch 'offline', (serverIsOffline) ->
-          if not serverIsOffline
-            refresh()
-          else $scope.errorMessage = motdService.disconnected
+          if (serverIsOffline?)
+            if not serverIsOffline
+              refresh()
+              UDC.ping("connect")
+            else
+              $scope.errorMessage = motdService.disconnected
 
         $scope.$watch 'unauthorized', (isUnauthorized) ->
           refresh()
@@ -86,7 +92,7 @@ angular.module('neo4jApp.controllers')
         # Authorization
         AuthService.hasValidAuthorization().then(
           ->
-            Frame.create({input:"#{Settings.initCmd}"})
+            Frame.create({input:"#{Settings.cmdchar}play welcome"})
             Frame.createOne({input:"#{Settings.cmdchar}server connect"})
           ,
           (r) ->
@@ -98,6 +104,7 @@ angular.module('neo4jApp.controllers')
 
         $scope.$watch 'server', (val) ->
           $scope.neo4j.version = val.neo4j_version
+
           if val.neo4j_version then $scope.motd.setCallToActionVersion(val.neo4j_version)
         , true
 

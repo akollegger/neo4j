@@ -86,6 +86,9 @@ public class MigrationTestUtils
         fileChannel.close();
     }
 
+    /**
+     * Removes the version trailer from the store files.
+     */
     public static void truncateFile( FileSystemAbstraction fileSystem, File storeFile,
             String suffixToDetermineTruncationLength ) throws IOException
     {
@@ -269,7 +272,7 @@ public class MigrationTestUtils
         @Override
         public boolean accept( StoreFile item )
         {
-            return item != StoreFile.COUNTS_STORE_ALPHA && item != StoreFile.COUNTS_STORE_BETA;
+            return item != StoreFile.COUNTS_STORE_LEFT && item != StoreFile.COUNTS_STORE_RIGHT;
         }
     };
 }

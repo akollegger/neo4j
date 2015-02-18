@@ -30,10 +30,8 @@ import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.collection.primitive.PrimitiveLongCollections;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
 import org.neo4j.cursor.Cursor;
-import org.neo4j.function.primitive.PrimitiveLongPredicate;
 import org.neo4j.graphdb.Direction;
 import org.neo4j.helpers.Predicate;
-import org.neo4j.helpers.ThisShouldNotHappenError;
 import org.neo4j.kernel.api.EntityType;
 import org.neo4j.kernel.api.LegacyIndex;
 import org.neo4j.kernel.api.LegacyIndexHits;
@@ -588,8 +586,7 @@ public class StateHandlingStatementOperations implements
 
     @Override
     public PrimitiveLongIterator nodesGetFromIndexLookup( KernelStatement state, IndexDescriptor index,
-                                                          final Object value )
-            throws IndexNotFoundKernelException
+            Object value ) throws IndexNotFoundKernelException
     {
         PrimitiveLongResourceIterator committed = storeLayer.nodesGetFromIndexLookup( state, index, value );
         PrimitiveLongIterator exactMatches = filterExactIndexMatches( state, index, value, committed );
@@ -597,45 +594,10 @@ public class StateHandlingStatementOperations implements
         return resourceIterator( changeFilteredMatches, committed );
     }
 
-    private PrimitiveLongIterator filterExactIndexMatches(
-            KernelStatement state,
-            IndexDescriptor index,
-            Object value,
-            PrimitiveLongIterator committed )
+    private PrimitiveLongIterator filterExactIndexMatches( final KernelStatement state, IndexDescriptor index,
+            Object value, PrimitiveLongResourceIterator committed )
     {
-        if ( isNumberOrArray( value ) )
-        {
-            return PrimitiveLongCollections.filter( committed, exactMatch( state, index.getPropertyKeyId(), value ) );
-        }
-        return committed;
-    }
-
-    private boolean isNumberOrArray( Object value )
-    {
-        return value instanceof Number || value.getClass().isArray();
-    }
-
-    private PrimitiveLongPredicate exactMatch(
-            final KernelStatement state,
-            final int propertyKeyId,
-            final Object value )
-    {
-        return new PrimitiveLongPredicate()
-        {
-            @Override
-            public boolean accept( long nodeId )
-            {
-                try
-                {
-                    return nodeGetProperty( state, nodeId, propertyKeyId ).valueEquals( value );
-                }
-                catch ( EntityNotFoundException e )
-                {
-                    throw new ThisShouldNotHappenError( "Chris", "An index claims a node by id " + nodeId +
-                            " has the value. However, it looks like that node does not exist.", e);
-                }
-            }
-        };
+        return LookupFilter.exactIndexMatches( this, state, committed, index.getPropertyKeyId(), value );
     }
 
     private PrimitiveLongIterator filterIndexStateChanges( KernelStatement state, IndexDescriptor index,
@@ -706,7 +668,7 @@ public class StateHandlingStatementOperations implements
         if ( existingProperty.isDefined() )
         {
             legacyPropertyTrackers.nodeRemoveStoreProperty( nodeId, (DefinedProperty) existingProperty );
-            state.txState().nodeDoRemoveProperty( nodeId, (DefinedProperty)existingProperty );
+            state.txState().nodeDoRemoveProperty( nodeId, (DefinedProperty) existingProperty );
             indexesUpdateProperty( state, nodeId, propertyKeyId, (DefinedProperty) existingProperty, null );
         }
         return existingProperty;
@@ -948,6 +910,14 @@ public class StateHandlingStatementOperations implements
     }
 
     @Override
+    public Cursor nodeGetRelationships( KernelStatement state, long nodeId, Direction direction, int[] types,
+                                        RelationshipVisitor<? extends RuntimeException> visitor )
+            throws EntityNotFoundException
+    {
+        return new RelationshipCursor( state, nodeGetRelationships( state, nodeId, direction, types ), visitor );
+    }
+
+    @Override
     public PrimitiveLongIterator nodeGetRelationships( KernelStatement state, long nodeId, Direction direction ) throws EntityNotFoundException
     {
         if ( state.hasTxStateWithChanges() )
@@ -965,6 +935,58 @@ public class StateHandlingStatementOperations implements
             return txState.augmentRelationships( nodeId, direction, stored );
         }
         return storeLayer.nodeListRelationships( nodeId, direction );
+    }
+
+    @Override
+    public Cursor nodeGetRelationships( KernelStatement state, long nodeId, Direction direction,
+                                        RelationshipVisitor<? extends RuntimeException> visitor )
+            throws EntityNotFoundException
+    {
+        return new RelationshipCursor( state, nodeGetRelationships( state, nodeId, direction ), visitor );
+    }
+
+    private class RelationshipCursor implements Cursor
+    {
+        private final PrimitiveLongIterator relationships;
+        private final KernelStatement state;
+        private final RelationshipVisitor<? extends RuntimeException> visitor;
+
+        public RelationshipCursor( KernelStatement state, PrimitiveLongIterator relationships,
+                                   RelationshipVisitor<? extends RuntimeException> visitor )
+        {
+            this.relationships = relationships;
+            this.state = state;
+            this.visitor = visitor;
+        }
+
+        @Override
+        public boolean next()
+        {
+            while ( relationships.hasNext() )
+            {
+                try
+                {
+                    relationshipVisit( state, relationships.next(), visitor );
+                }
+                catch ( EntityNotFoundException e )
+                {
+                    continue;
+                }
+                return true;
+            }
+            return false;
+        }
+
+        @Override
+        public void reset()
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void close()
+        {
+        }
     }
 
     @Override
@@ -1229,7 +1251,7 @@ public class StateHandlingStatementOperations implements
                     inputCursor, nodeId, types, expandDirection, relId, relType, direction, startNodeId, neighborNodeId );
         }
         return storeLayer.expand( inputCursor, nodeId, types, expandDirection,
-                relId, relType, direction, startNodeId, neighborNodeId );
+                                  relId, relType, direction, startNodeId, neighborNodeId );
     }
 
     @Override

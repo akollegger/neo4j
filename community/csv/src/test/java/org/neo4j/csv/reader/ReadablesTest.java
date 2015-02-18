@@ -19,23 +19,27 @@
  */
 package org.neo4j.csv.reader;
 
+import org.junit.Rule;
+import org.junit.Test;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.StringReader;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
-
-import org.junit.Rule;
-import org.junit.Test;
 
 import org.neo4j.test.TestDirectory;
 
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
+
+import static java.util.Arrays.copyOfRange;
 
 public class ReadablesTest
 {
@@ -44,15 +48,12 @@ public class ReadablesTest
     {
         // GIVEN
         String text = "abcdefghijlkmnopqrstuvxyz";
-        File compressed = compressWithZip( text );
 
         // WHEN
-        CharReadable readable = Readables.file( compressed );
-        char[] readText = new char[text.toCharArray().length];
-        readable.read( readText, 0, readText.length );
+        File compressed = compressWithZip( text );
 
         // THEN
-        assertArrayEquals( text.toCharArray(), readText );
+        assertReadText( compressed, text );
     }
 
     @Test
@@ -60,15 +61,12 @@ public class ReadablesTest
     {
         // GIVEN
         String text = "abcdefghijlkmnopqrstuvxyz";
-        File compressed = compressWithGZip( text );
 
         // WHEN
-        CharReadable readable = Readables.file( compressed );
-        char[] readText = new char[text.toCharArray().length];
-        readable.read( readText, 0, readText.length );
+        File compressed = compressWithGZip( text );
 
         // THEN
-        assertArrayEquals( text.toCharArray(), readText );
+        assertReadText( compressed, text );
     }
 
     @Test
@@ -76,15 +74,12 @@ public class ReadablesTest
     {
         // GIVEN
         String text = "abcdefghijlkmnopqrstuvxyz";
-        File plainText = write( text );
 
         // WHEN
-        CharReadable readable = Readables.file( plainText );
-        char[] readText = new char[text.toCharArray().length];
-        readable.read( readText, 0, readText.length );
+        File plainText = write( text );
 
         // THEN
-        assertArrayEquals( text.toCharArray(), readText );
+        assertReadText( plainText, text );
     }
 
     @Test
@@ -92,15 +87,12 @@ public class ReadablesTest
     {
         // GIVEN
         String text = "abcdefghijlkmnopqrstuvxyz";
-        File compressed = compressWithZip( text, ".nothing", ".DS_Store", "__MACOSX/", "__MACOSX/file" );
 
         // WHEN
-        CharReadable readable = Readables.file( compressed );
-        char[] readText = new char[text.toCharArray().length];
-        readable.read( readText, 0, readText.length );
+        File compressed = compressWithZip( text, ".nothing", ".DS_Store", "__MACOSX/", "__MACOSX/file" );
 
         // THEN
-        assertArrayEquals( text.toCharArray(), readText );
+        assertReadText( compressed, text );
     }
 
     @Test
@@ -121,6 +113,31 @@ public class ReadablesTest
         {   // Good
             assertThat( e.getMessage(), containsString( "Multiple" ) );
         }
+    }
+
+    @Test
+    public void shouldTrackPosition() throws Exception
+    {
+        // GIVEN
+        String data = "1234567890";
+        //                 ^   ^
+        CharReadable reader = Readables.wrap( new StringReader( data ) );
+        SectionedCharBuffer buffer = new SectionedCharBuffer( 4 );
+
+        // WHEN
+        int expected = 0;
+        do
+        {
+            buffer = reader.read( buffer, buffer.front() );
+            expected += buffer.available();
+
+            // THEN
+            assertEquals( expected, reader.position() );
+        }
+        while ( buffer.hasAvailable() );
+
+        // and THEN
+        assertEquals( data.toCharArray().length, expected );
     }
 
     private File write( String text ) throws IOException
@@ -159,6 +176,14 @@ public class ReadablesTest
             out.write( text.getBytes() );
         }
         return file;
+    }
+
+    private void assertReadText( File file, String text ) throws IOException
+    {
+        CharReadable readable = Readables.file( file );
+        SectionedCharBuffer readText = new SectionedCharBuffer( text.toCharArray().length );
+        readable.read( readText, readText.front() );
+        assertArrayEquals( text.toCharArray(), copyOfRange( readText.array(), readText.pivot(), readText.front() ) );
     }
 
     public final @Rule TestDirectory directory = new TestDirectory();

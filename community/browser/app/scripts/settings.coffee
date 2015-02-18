@@ -1,5 +1,5 @@
 ###!
-Copyright (c) 2002-2014 "Neo Technology,"
+Copyright (c) 2002-2015 "Neo Technology,"
 Network Engine for Objects in Lund AB [http://neotechnology.com]
 
 This file is part of Neo4j.
@@ -31,7 +31,6 @@ angular.module('neo4jApp.settings', ['neo4jApp.utils'])
       rest: restAPI
       cypher: "#{restAPI}/cypher"
       transaction: "#{restAPI}/transaction"
-      auth: "#{baseURL}/authentication"
       authUser: "#{baseURL}/user"
     host: baseURL
     maxExecutionTime: 3600 # in seconds
@@ -45,6 +44,7 @@ angular.module('neo4jApp.settings', ['neo4jApp.utils'])
     maxRawSize: 5000 # bytes
     scrollToTop: yes # When new frames are inserted in to the stream
     showVizDiagnostics: false
+    acceptsReplies: false
     initCmd: ":play welcome"
   })
 

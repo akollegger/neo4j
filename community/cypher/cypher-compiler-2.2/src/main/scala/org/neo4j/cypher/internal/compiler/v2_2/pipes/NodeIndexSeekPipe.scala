@@ -35,7 +35,7 @@ case class NodeIndexSeekPipe(ident: String,
                              propertyKey: PropertyKeyToken,
                              valueExpr: QueryExpression[Expression],
                              unique: Boolean = false)
-                            (val estimatedCardinality: Option[Long] = None)(implicit pipeMonitor: PipeMonitor)
+                            (val estimatedCardinality: Option[Double] = None)(implicit pipeMonitor: PipeMonitor)
   extends Pipe with RonjaPipe {
 
   val descriptor = new IndexDescriptor(label.nameId.id, propertyKey.nameId.id)
@@ -47,9 +47,12 @@ case class NodeIndexSeekPipe(ident: String,
       (state: QueryState) => (x: Any) => state.query.exactIndexSearch(descriptor, x)
 
   protected def internalCreateResults(state: QueryState): Iterator[ExecutionContext] = {
+    //register as parent so that stats are associated with this pipe
+    state.decorator.registerParentPipe(this)
+
     val index = indexFactory(state)
-    val resultNodes = indexQuery(valueExpr, ExecutionContext.empty, state, index, label.name, propertyKey.name)
     val baseContext = state.initialContext.getOrElse(ExecutionContext.empty)
+    val resultNodes = indexQuery(valueExpr, baseContext, state, index, label.name, propertyKey.name)
     resultNodes.map(node => baseContext.newWith1(ident, node))
   }
 
@@ -73,5 +76,5 @@ case class NodeIndexSeekPipe(ident: String,
 
   override def localEffects = Effects.READS_NODES
 
-  def withEstimatedCardinality(estimated: Long) = copy()(Some(estimated))
+  def withEstimatedCardinality(estimated: Double) = copy()(Some(estimated))
 }

@@ -20,12 +20,13 @@
 package org.neo4j.cypher.internal.compiler.v2_2.commands.expressions
 
 import org.neo4j.cypher.internal.PathImpl
-import org.neo4j.graphdb.{Node, PropertyContainer, Relationship}
+import org.neo4j.graphdb.{Direction, Node, PropertyContainer, Relationship}
+import org.neo4j.helpers.ThisShouldNotHappenError
 
 final class PathValueBuilder {
   private val builder = Vector.newBuilder[PropertyContainer]
   private var nulled = false
-
+  private var previousNode: Node = null
   def result(): PathImpl = if (nulled) null else new PathImpl(builder.result(): _*)
 
   def clear(): PathValueBuilder =  {
@@ -35,20 +36,29 @@ final class PathValueBuilder {
   }
 
   def addNode(node: Node): PathValueBuilder = nullCheck(node) {
-      builder += node
-      this
+    previousNode = node
+    builder += node
+    this
   }
 
   def addIncomingRelationship(rel: Relationship): PathValueBuilder = nullCheck(rel) {
     builder += rel
-    builder += rel.getStartNode
+    previousNode = rel.getStartNode
+    builder += previousNode
     this
   }
 
   def addOutgoingRelationship(rel: Relationship): PathValueBuilder = nullCheck(rel) {
     builder += rel
-    builder += rel.getEndNode
+    previousNode = rel.getEndNode
+    builder += previousNode
     this
+  }
+
+  def addUndirectedRelationship(rel: Relationship): PathValueBuilder = nullCheck(rel) {
+    if (rel.getStartNode == previousNode) addOutgoingRelationship(rel)
+    else if (rel.getEndNode == previousNode) addIncomingRelationship(rel)
+    else throw new ThisShouldNotHappenError("pontus", s"Invalid usage of PathValueBuilder, $previousNode must be a node in $rel")
   }
 
   def addIncomingRelationships(rels: Iterable[Relationship]): PathValueBuilder = nullCheck(rels) {
@@ -65,6 +75,13 @@ final class PathValueBuilder {
     this
   }
 
+  def addUndirectedRelationships(rels: Iterable[Relationship]): PathValueBuilder = nullCheck(rels) {
+    val iterator = rels.iterator
+    while (iterator.hasNext)
+      addUndirectedRelationship(iterator.next())
+    this
+  }
+
   private def nullCheck[A](value: A)(f: => PathValueBuilder):PathValueBuilder = value match {
     case null =>
       nulled = true
@@ -72,5 +89,4 @@ final class PathValueBuilder {
 
     case _ => f
   }
-
 }

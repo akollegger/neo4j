@@ -46,6 +46,7 @@ import org.neo4j.kernel.impl.store.record.Record;
 import org.neo4j.kernel.impl.util.StringLogger;
 
 import static java.nio.ByteBuffer.wrap;
+
 import static org.neo4j.helpers.Exceptions.launderedException;
 import static org.neo4j.helpers.UTF8.encode;
 import static org.neo4j.io.fs.FileUtils.windowsSafeIOOperation;
@@ -58,7 +59,7 @@ import static org.neo4j.io.pagecache.PagedFile.PF_SHARED_LOCK;
  */
 public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
 {
-    public static final String ALL_STORES_VERSION = "v0.A.4";
+    public static final String ALL_STORES_VERSION = "v0.A.5";
     public static final String UNKNOWN_VERSION = "Unknown";
     protected final Config configuration;
     protected final PageCache pageCache;
@@ -283,7 +284,7 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
             {
                 if ( stringLogger != null )
                 {
-                    stringLogger.logMessage( getStorageFileName() + " non clean shutdown detected", true );
+                    stringLogger.debug( getStorageFileName() + " non clean shutdown detected" );
                 }
             }
         }
@@ -381,8 +382,8 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
 
         stringLogger.debug( "[" + getStorageFileName() + "] high id=" + getHighId()
                             + " (defragged=" + defraggedCount + ")" );
-        stringLogger.logMessage( getStorageFileName() + " rebuild id generator, highId=" + getHighId() +
-                                 " defragged count=" + defraggedCount, true );
+        stringLogger.debug( getStorageFileName() + " rebuild id generator, highId=" + getHighId() +
+                                 " defragged count=" + defraggedCount );
 
         if ( !fastRebuild )
         {

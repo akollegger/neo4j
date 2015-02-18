@@ -279,10 +279,24 @@ public class OperationsFacade implements ReadOperations, DataWriteOperations, Sc
     }
 
     @Override
+    public PrimitiveLongIterator nodeGetAllPropertiesKeys( long nodeId ) throws EntityNotFoundException
+    {
+        statement.assertOpen();
+        return dataRead().nodeGetPropertyKeys(statement, nodeId);
+    }
+
+    @Override
     public Iterator<DefinedProperty> nodeGetAllProperties( long nodeId ) throws EntityNotFoundException
     {
         statement.assertOpen();
         return dataRead().nodeGetAllProperties( statement, nodeId );
+    }
+
+    @Override
+    public PrimitiveLongIterator relationshipGetAllPropertiesKeys( long nodeId ) throws EntityNotFoundException
+    {
+        statement.assertOpen();
+        return dataRead().relationshipGetPropertyKeys(statement, nodeId);
     }
 
     @Override
@@ -318,6 +332,24 @@ public class OperationsFacade implements ReadOperations, DataWriteOperations, Sc
         statement.assertOpen();
         return dataRead().expand( statement, inputCursor, nodeId, types, expandDirection,
                 relId, relType, direction, startNodeId, neighborNodeId );
+    }
+
+    @Override
+    public Cursor nodeGetRelationships( long nodeId, Direction direction,
+                                 RelationshipVisitor<? extends RuntimeException> visitor )
+            throws EntityNotFoundException
+    {
+        statement.assertOpen();
+        return dataRead().nodeGetRelationships( statement, nodeId, direction, visitor );
+    }
+
+    @Override
+    public Cursor nodeGetRelationships( long nodeId, Direction direction, int[] types,
+                                 RelationshipVisitor<? extends RuntimeException> visitor )
+            throws EntityNotFoundException
+    {
+        statement.assertOpen();
+        return dataRead().nodeGetRelationships( statement, nodeId, direction, types, visitor );
     }
 
     // </DataRead>

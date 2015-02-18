@@ -29,6 +29,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 import javax.servlet.Filter;
 
 import org.neo4j.graphdb.DependencyResolver;
@@ -38,7 +39,6 @@ import org.neo4j.helpers.Function;
 import org.neo4j.helpers.Provider;
 import org.neo4j.helpers.RunCarefully;
 import org.neo4j.helpers.Settings;
-import org.neo4j.kernel.DefaultFileSystemAbstraction;
 import org.neo4j.kernel.InternalAbstractGraphDatabase;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.guard.Guard;
@@ -82,8 +82,8 @@ import org.neo4j.server.rest.transactional.TransitionalPeriodTransactionMessCont
 import org.neo4j.server.rest.web.DatabaseActions;
 import org.neo4j.server.rrd.RrdDbProvider;
 import org.neo4j.server.rrd.RrdFactory;
+import org.neo4j.server.security.auth.AuthManager;
 import org.neo4j.server.security.auth.FileUserRepository;
-import org.neo4j.server.security.auth.SecurityCentral;
 import org.neo4j.server.security.ssl.KeyStoreFactory;
 import org.neo4j.server.security.ssl.KeyStoreInformation;
 import org.neo4j.server.security.ssl.SslCertificateFactory;
@@ -123,7 +123,7 @@ public abstract class AbstractNeoServer implements NeoServer
     protected ConfigurationBuilder configurator;
     protected WebServer webServer;
 
-    protected SecurityCentral security;
+    protected AuthManager authManager;
 
     private final PreFlightTasks preFlight;
 
@@ -166,10 +166,9 @@ public abstract class AbstractNeoServer implements NeoServer
 
         this.database = life.add( dependencyResolver.satisfyDependency(dbFactory.newDatabase( dbConfig, dependencies)) );
 
-        FileUserRepository users = life.add(new FileUserRepository( new DefaultFileSystemAbstraction(),
-                configurator.configuration().get( ServerInternalSettings.authorization_store )));
+        FileUserRepository users = life.add( new FileUserRepository( configurator.configuration().get( ServerInternalSettings.authorization_store ).toPath(), dependencies.logging() ) );
 
-        this.security = life.add(new SecurityCentral( Clock.SYSTEM_CLOCK, users ));
+        this.authManager = life.add(new AuthManager( Clock.SYSTEM_CLOCK, users ));
         this.preFlight = dependencyResolver.satisfyDependency(createPreflightTasks());
         this.webServer = createWebServer();
 
@@ -719,7 +718,7 @@ public abstract class AbstractNeoServer implements NeoServer
         singletons.add( new ExecutionEngineProvider( cypherExecutor ) );
 
         singletons.add( providerForSingleton( transactionFacade, TransactionFacade.class ) );
-        singletons.add( providerForSingleton( security, SecurityCentral.class ) );
+        singletons.add( providerForSingleton( authManager, AuthManager.class ) );
         singletons.add( new TransactionFilter( database ) );
         singletons.add( new LoggingProvider( dependencies.logging() ) );
         singletons.add( providerForSingleton( dependencies.logging().getConsoleLog( NeoServer.class ), ConsoleLogger.class ) );

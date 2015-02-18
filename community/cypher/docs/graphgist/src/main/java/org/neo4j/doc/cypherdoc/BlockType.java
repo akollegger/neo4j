@@ -299,8 +299,8 @@ enum BlockType
                 }
                 if ( exec )
                 {
-                    state.latestResult = new Result( fileQuery, state.engine.profile( fileQuery, state.parameters ),
-                            state.database );
+                    state.latestResult =
+                            new Result( fileQuery, state.engine.profile( fileQuery, state.parameters ), state.database );
                     prettifiedStatements.add( state.engine.prettify( webQuery ) );
                     try (Transaction tx = state.database.beginTx())
                     {
@@ -313,6 +313,7 @@ enum BlockType
                     prettifiedStatements.add( webQuery );
                 }
             }
+
 
             state.parameters.clear();
             String cypher = StringUtils.join( prettifiedStatements, CypherDoc.EOL );
@@ -327,6 +328,7 @@ enum BlockType
         {
             return isCodeBlock( "sql", block );
         }
+
 
         @Override
         String process( Block block, State state )

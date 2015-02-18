@@ -19,6 +19,12 @@
  */
 package org.neo4j.unsafe.impl.batchimport;
 
+import org.junit.ClassRule;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -33,11 +39,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.locks.LockSupport;
-
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 
 import org.neo4j.collection.pool.Pool;
 import org.neo4j.consistency.ConsistencyCheckService;
@@ -59,6 +60,7 @@ import org.neo4j.io.fs.StoreChannel;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.kernel.logging.DevNullLoggingService;
+import org.neo4j.test.RandomRule;
 import org.neo4j.test.TargetDirectory;
 import org.neo4j.tooling.GlobalGraphOperations;
 import org.neo4j.unsafe.impl.batchimport.cache.AvailableMemoryCalculator;
@@ -71,8 +73,6 @@ import org.neo4j.unsafe.impl.batchimport.store.BatchingPageCache.Writer;
 import org.neo4j.unsafe.impl.batchimport.store.BatchingPageCache.WriterFactory;
 import org.neo4j.unsafe.impl.batchimport.store.io.IoQueue;
 import org.neo4j.unsafe.impl.batchimport.store.io.Monitor;
-
-import static java.lang.System.currentTimeMillis;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -162,7 +162,7 @@ public class ParallelBatchImporterTest
         {
             // WHEN
             inserter.doImport( Inputs.input( nodes( NODE_COUNT, inputIdGenerator ),
-                    relationships( relationshipCount, inputIdGenerator ), idMapper, idGenerator ) );
+                    relationships( relationshipCount, inputIdGenerator ), idMapper, idGenerator, false ) );
             // THEN
             GraphDatabaseService db = new GraphDatabaseFactory().newEmbeddedDatabase( directory.absolutePath() );
             try ( Transaction tx = db.beginTx() )
@@ -184,11 +184,11 @@ public class ParallelBatchImporterTest
                 File failureFile = directory.file( "input" );
                 try ( PrintStream out = new PrintStream( failureFile ) )
                 {
-                    out.println( "Seed used in this failing run: " + inputIdGenerator.seed );
+                    out.println( "Seed used in this failing run: " + random.seed() );
                     out.println( inputIdGenerator );
                     for ( InputRelationship relationship : relationships( relationshipCount, inputIdGenerator ) )
                     {
-                        out.println( relationship.id() + " " +
+                        out.println( (relationship.hasSpecificId() ? relationship.specificId() + " " : "") +
                                 relationship.startNode() + "-[:" + relationship.type() + "]->" + relationship.endNode() );
                     }
                 }
@@ -208,22 +208,13 @@ public class ParallelBatchImporterTest
 
     private static abstract class InputIdGenerator
     {
-        protected final long seed = currentTimeMillis();
-        protected volatile Random randomType, random;
-
         abstract Object nextNodeId();
-
-        void resetRandomness()
-        {
-            randomType = new Random( seed );
-            random = new Random( seed );
-        }
 
         abstract Object randomExisting();
 
         String randomType()
         {
-            return "TYPE" + randomType.nextInt( 3 );
+            return "TYPE" + random.nextInt( 3 );
         }
 
         @Override
@@ -266,18 +257,6 @@ public class ParallelBatchImporterTest
         Object randomExisting()
         {
             return strings.get( random.nextInt( strings.size() ) );
-        }
-
-        @Override
-        public String toString()
-        {
-            StringBuilder builder = new StringBuilder( "Nodes" );
-            long i = 0;
-            for ( String string : strings )
-            {
-                builder.append( "\n" ).append( i++ ).append( " " ).append( string );
-            }
-            return builder.toString();
         }
     }
 
@@ -359,14 +338,14 @@ public class ParallelBatchImporterTest
         }
     };
 
-    private static Iterable<InputRelationship> relationships( final long count, final InputIdGenerator idGenerator )
+    private Iterable<InputRelationship> relationships( final long count, final InputIdGenerator idGenerator )
     {
         return new Iterable<InputRelationship>()
         {
             @Override
             public Iterator<InputRelationship> iterator()
             {
-                idGenerator.resetRandomness();
+                random.reset();
                 return new PrefetchingIterator<InputRelationship>()
                 {
                     private int cursor;
@@ -388,7 +367,8 @@ public class ParallelBatchImporterTest
                             {
                                 Object startNode = idGenerator.randomExisting();
                                 Object endNode = idGenerator.randomExisting();
-                                return new InputRelationship( cursor, properties, null,
+                                return new InputRelationship(
+                                        properties, null,
                                         startNode, endNode,
                                         idGenerator.randomType(), null );
                             }
@@ -464,4 +444,6 @@ public class ParallelBatchImporterTest
             return "low memory";
         }
     };
+
+    public static final @ClassRule RandomRule random = new RandomRule();
 }

@@ -45,10 +45,12 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -369,16 +371,18 @@ public class EphemeralFileSystemAbstraction implements FileSystemAbstraction
         }
 
         List<String> directoryPathItems = splitPath( directory );
-        List<File> found = new ArrayList<>();
-        for ( Map.Entry<File,EphemeralFileData> file : files.entrySet() )
+        Set<File> found = new HashSet<>();
+        Iterator<File> files = new CombiningIterator<>( asList( this.files.keySet().iterator(), directories.iterator() ) );
+        while ( files.hasNext() )
         {
-            File fileName = file.getKey();
-            List<String> fileNamePathItems = splitPath( fileName );
+            File file = files.next();
+            List<String> fileNamePathItems = splitPath( file );
             if ( directoryMatches( directoryPathItems, fileNamePathItems ) )
             {
                 found.add( constructPath( fileNamePathItems, directoryPathItems.size() + 1 ) );
             }
         }
+
         return found.toArray( new File[found.size()] );
     }
 
@@ -392,11 +396,12 @@ public class EphemeralFileSystemAbstraction implements FileSystemAbstraction
         }
 
         List<String> directoryPathItems = splitPath( directory );
-        List<File> found = new ArrayList<>();
-        for ( Map.Entry<File,EphemeralFileData> file : files.entrySet() )
+        Set<File> found = new HashSet<>();
+        Iterator<File> files = new CombiningIterator<>( asList( this.files.keySet().iterator(), directories.iterator() ) );
+        while ( files.hasNext() )
         {
-            File fileName = file.getKey();
-            List<String> fileNamePathItems = splitPath( fileName );
+            File file = files.next();
+            List<String> fileNamePathItems = splitPath( file );
             if ( directoryMatches( directoryPathItems, fileNamePathItems ) )
             {
                 File path = constructPath( fileNamePathItems, directoryPathItems.size() + 1 );
@@ -919,44 +924,27 @@ public class EphemeralFileSystemAbstraction implements FileSystemAbstraction
         Iterator<EphemeralFileChannel> getOpenChannels()
         {
             final Iterator<WeakReference<EphemeralFileChannel>> refs = channels.iterator();
-            return new Iterator<EphemeralFileChannel>()
-            {
-                private EphemeralFileChannel current = fetchNextOrNull();
 
-                private EphemeralFileChannel fetchNextOrNull()
-                {
-                    while ( refs.hasNext() )
-                    {
-                        EphemeralFileChannel channel = refs.next().get();
-                        if ( channel != null )
+            return new PrefetchingIterator<EphemeralFileChannel>()
                         {
-                            return channel;
-                        }
-                        refs.remove();
-                    }
-                    return null;
-                }
+                            @Override
+                            protected EphemeralFileChannel fetchNextOrNull()
+                            {
+                                while ( refs.hasNext() )
+                                {
+                                    EphemeralFileChannel channel = refs.next().get();
+                                    if ( channel != null ) return channel;
+                                    refs.remove();
+                                }
+                                return null;
+                            }
 
-                @Override
-                public boolean hasNext()
-                {
-                    return current != null;
-                }
-
-                @Override
-                public EphemeralFileChannel next()
-                {
-                    EphemeralFileChannel value = current;
-                    current = fetchNextOrNull();
-                    return value;
-                }
-
-                @Override
-                public void remove()
-                {
-                    refs.remove();
-                }
-            };
+                            @Override
+                            public void remove()
+                            {
+                                refs.remove();
+                            }
+                        };
         }
 
         long size()
@@ -1279,6 +1267,116 @@ public class EphemeralFileSystemAbstraction implements FileSystemAbstraction
                 size -= read;
                 target.write( scratchPad, 0, read );
             }
+        }
+    }
+
+    // Copied from kernel since we don't want to depend on that module here
+    private static abstract class PrefetchingIterator<T> implements Iterator<T>
+    {
+        boolean hasFetchedNext;
+        T nextObject;
+
+    	/**
+    	 * @return {@code true} if there is a next item to be returned from the next
+    	 * call to {@link #next()}.
+    	 */
+    	@Override
+        public boolean hasNext()
+    	{
+    		return peek() != null;
+    	}
+
+        /**
+         * @return the next element that will be returned from {@link #next()} without
+         * actually advancing the iterator
+         */
+        public T peek()
+        {
+            if ( hasFetchedNext )
+            {
+                return nextObject;
+            }
+
+            nextObject = fetchNextOrNull();
+            hasFetchedNext = true;
+            return nextObject;
+        }
+
+        /**
+    	 * Uses {@link #hasNext()} to try to fetch the next item and returns it
+    	 * if found, otherwise it throws a {@link java.util.NoSuchElementException}.
+    	 *
+    	 * @return the next item in the iteration, or throws
+    	 * {@link java.util.NoSuchElementException} if there's no more items to return.
+    	 */
+    	@Override
+        public T next()
+    	{
+    		if ( !hasNext() )
+    		{
+    			throw new NoSuchElementException();
+    		}
+    		T result = nextObject;
+    		nextObject = null;
+    		hasFetchedNext = false;
+    		return result;
+    	}
+
+    	protected abstract T fetchNextOrNull();
+
+    	@Override
+        public void remove()
+    	{
+    		throw new UnsupportedOperationException();
+    	}
+    }
+
+    private static class CombiningIterator<T> extends PrefetchingIterator<T>
+    {
+        private Iterator<? extends Iterator<T>> iterators;
+        private Iterator<T> currentIterator;
+
+        public CombiningIterator( Iterable<? extends Iterator<T>> iterators )
+        {
+            this( iterators.iterator() );
+        }
+
+        public CombiningIterator( Iterator<? extends Iterator<T>> iterators )
+        {
+            this.iterators = iterators;
+        }
+
+        public CombiningIterator( T first, Iterator<T> rest )
+        {
+            this( Collections.<Iterator<T>>emptyList() );
+            this.hasFetchedNext = true;
+            this.nextObject = first;
+            this.currentIterator = rest;
+        }
+
+        @Override
+        protected T fetchNextOrNull()
+        {
+            if ( currentIterator == null || !currentIterator.hasNext() )
+            {
+                while ( (currentIterator = nextIteratorOrNull()) != null )
+                {
+                    if ( currentIterator.hasNext() )
+                    {
+                        break;
+                    }
+                }
+            }
+            return currentIterator != null && currentIterator.hasNext() ? currentIterator.next() : null;
+        }
+
+        protected Iterator<T> nextIteratorOrNull()
+        {
+            if(iterators.hasNext())
+            {
+                return iterators.next();
+            }
+            return null;
         }
     }
 }

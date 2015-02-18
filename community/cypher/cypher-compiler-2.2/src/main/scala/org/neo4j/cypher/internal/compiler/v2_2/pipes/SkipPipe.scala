@@ -25,9 +25,12 @@ import org.neo4j.cypher.internal.compiler.v2_2.planDescription.InternalPlanDescr
 import org.neo4j.cypher.internal.compiler.v2_2.symbols.SymbolTable
 
 case class SkipPipe(source: Pipe, exp: Expression)
-                   (val estimatedCardinality: Option[Long] = None)(implicit pipeMonitor: PipeMonitor)
+                   (val estimatedCardinality: Option[Double] = None)(implicit pipeMonitor: PipeMonitor)
   extends PipeWithSource(source, pipeMonitor) with NumericHelper with RonjaPipe {
   protected def internalCreateResults(input: Iterator[ExecutionContext], state: QueryState): Iterator[ExecutionContext] = {
+    //register as parent so that stats are associated with this pipe
+    state.decorator.registerParentPipe(this)
+
     if(input.isEmpty)
       return Iterator.empty
 
@@ -53,5 +56,5 @@ case class SkipPipe(source: Pipe, exp: Expression)
 
   override def localEffects = exp.effects
 
-  def withEstimatedCardinality(estimated: Long) = copy()(Some(estimated))
+  def withEstimatedCardinality(estimated: Double) = copy()(Some(estimated))
 }

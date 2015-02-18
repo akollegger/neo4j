@@ -45,6 +45,8 @@ trait QueryContext extends TokenContext {
 
   def createRelationship(start: Node, end: Node, relType: String): Relationship
 
+  def getOrCreateRelTypeId(relTypeName: String): Int
+
   def getRelationshipsForIds(node: Node, dir: Direction, types: Option[Seq[Int]]): Iterator[Relationship]
 
   def getOrCreateLabelId(labelName: String): Int
@@ -56,6 +58,10 @@ trait QueryContext extends TokenContext {
   def setLabelsOnNode(node: Long, labelIds: Iterator[Int]): Int
 
   def removeLabelsFromNode(node: Long, labelIds: Iterator[Int]): Int
+
+  def getPropertiesForNode(node: Long): Iterator[Long]
+
+  def getPropertiesForRelationship(relId: Long): Iterator[Long]
 
   def getOrCreatePropertyKeyId(propertyKey: String): Int
 
@@ -99,6 +105,10 @@ trait QueryContext extends TokenContext {
   def relationshipStartNode(rel: Relationship): Node
 
   def relationshipEndNode(rel: Relationship): Node
+
+  def nodeGetDegree(node: Long, dir: Direction): Int
+
+  def nodeGetDegree(node: Long, dir: Direction, relTypeId: Int): Int
 }
 
 trait LockingQueryContext extends QueryContext {

@@ -42,6 +42,8 @@ class DelegatingQueryContext(inner: QueryContext) extends QueryContext {
 
   def createRelationship(start: Node, end: Node, relType: String): Relationship = singleDbHit(inner.createRelationship(start, end, relType))
 
+  def getOrCreateRelTypeId(relTypeName: String): Int = singleDbHit(inner.getOrCreateRelTypeId(relTypeName))
+
   def getLabelsForNode(node: Long): Iterator[Int] = singleDbHit(inner.getLabelsForNode(node))
 
   def getLabelName(id: Int): String = singleDbHit(inner.getLabelName(id))
@@ -60,6 +62,10 @@ class DelegatingQueryContext(inner: QueryContext) extends QueryContext {
 
   def removeLabelsFromNode(node: Long, labelIds: Iterator[Int]): Int =
     singleDbHit(inner.removeLabelsFromNode(node, labelIds))
+
+  def getPropertiesForNode(node: Long): Iterator[Long] = singleDbHit(inner.getPropertiesForNode(node))
+
+  def getPropertiesForRelationship(relId: Long): Iterator[Long] = singleDbHit(inner.getPropertiesForRelationship(relId))
 
   def getPropertyKeyName(propertyKeyId: Int): String = singleDbHit(inner.getPropertyKeyName(propertyKeyId))
 
@@ -105,6 +111,9 @@ class DelegatingQueryContext(inner: QueryContext) extends QueryContext {
 
   def relationshipEndNode(rel: Relationship) = inner.relationshipEndNode(rel)
 
+  def nodeGetDegree(node: Long, dir: Direction): Int = singleDbHit(inner.nodeGetDegree(node, dir))
+
+  def nodeGetDegree(node: Long, dir: Direction, relTypeId: Int): Int = singleDbHit(inner.nodeGetDegree(node, dir, relTypeId))
 }
 
 class DelegatingOperations[T <: PropertyContainer](protected val inner: Operations[T]) extends Operations[T] {

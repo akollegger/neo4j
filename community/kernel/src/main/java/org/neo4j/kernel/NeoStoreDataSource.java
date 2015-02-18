@@ -101,6 +101,8 @@ import org.neo4j.kernel.impl.store.StoreFactory;
 import org.neo4j.kernel.impl.store.StoreId;
 import org.neo4j.kernel.impl.store.record.SchemaRule;
 import org.neo4j.kernel.impl.storemigration.StoreUpgrader;
+import org.neo4j.kernel.impl.storemigration.StoreVersionCheck;
+import org.neo4j.kernel.impl.storemigration.UpgradableDatabase;
 import org.neo4j.kernel.impl.transaction.TransactionHeaderInformationFactory;
 import org.neo4j.kernel.impl.transaction.TransactionMonitor;
 import org.neo4j.kernel.impl.transaction.log.LogFile;
@@ -150,7 +152,6 @@ import org.neo4j.kernel.logging.Logging;
 import org.neo4j.kernel.monitoring.Monitors;
 
 import static org.neo4j.helpers.collection.Iterables.toList;
-import static org.neo4j.kernel.impl.store.StoreFactory.COUNTS_STORE;
 import static org.neo4j.kernel.impl.transaction.log.entry.LogHeader.LOG_HEADER_SIZE;
 import static org.neo4j.kernel.impl.transaction.state.CacheLoaders.nodeLoader;
 import static org.neo4j.kernel.impl.transaction.state.CacheLoaders.relationshipLoader;
@@ -553,7 +554,8 @@ public class NeoStoreDataSource implements NeoStoreProvider, Lifecycle, IndexPro
     // of the dependency tree, starting at the bottom
     private void upgradeStore( File store, StoreUpgrader storeMigrationProcess, SchemaIndexProvider indexProvider )
     {
-        storeMigrationProcess.addParticipant( indexProvider.storeMigrationParticipant() );
+        UpgradableDatabase upgradableDatabase = new UpgradableDatabase( new StoreVersionCheck( fs ) );
+        storeMigrationProcess.addParticipant( indexProvider.storeMigrationParticipant( fs, upgradableDatabase ) );
         storeMigrationProcess.migrateIfNeeded( store.getParentFile(), indexProvider, pageCache );
     }
 
@@ -566,7 +568,7 @@ public class NeoStoreDataSource implements NeoStoreProvider, Lifecycle, IndexPro
         life.add( new LifecycleAdapter()
         {
             @Override
-            public void start()
+            public void start() throws IOException
             {
                 if ( startupStatistics.numberOfRecoveredTransactions() > 0 )
                 {
@@ -574,16 +576,13 @@ public class NeoStoreDataSource implements NeoStoreProvider, Lifecycle, IndexPro
                 }
                 neoStoreModule.neoStore().makeStoreOk();
 
-                propertyKeyTokenHolder.addTokens(
+                propertyKeyTokenHolder.setInitialTokens(
                         neoStoreModule.neoStore().getPropertyKeyTokenStore().getTokens( Integer.MAX_VALUE ) );
-                relationshipTypeTokens.addTokens(
+                relationshipTypeTokens.setInitialTokens(
                         neoStoreModule.neoStore().getRelationshipTypeTokenStore().getTokens( Integer.MAX_VALUE ) );
-                labelTokens.addTokens( neoStoreModule.neoStore().getLabelTokenStore().getTokens( Integer.MAX_VALUE ) );
+                labelTokens.setInitialTokens( neoStoreModule.neoStore().getLabelTokenStore().getTokens( Integer.MAX_VALUE ) );
 
-                if ( neoStore.getCounts() == null )
-                {
-                    neoStore.rebuildCountStoreIfNeeded( storeFactory.storeFileName( COUNTS_STORE ) );
-                }
+                neoStore.rebuildCountStoreIfNeeded(); // TODO: move this to lifecycle
             }
         } );
 

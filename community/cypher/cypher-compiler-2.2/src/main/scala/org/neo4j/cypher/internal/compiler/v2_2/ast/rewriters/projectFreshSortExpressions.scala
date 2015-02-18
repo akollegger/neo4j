@@ -20,7 +20,7 @@
 package org.neo4j.cypher.internal.compiler.v2_2.ast.rewriters
 
 import org.neo4j.cypher.internal.compiler.v2_2.ast._
-import org.neo4j.cypher.internal.compiler.v2_2.{Rewriter, bottomUp}
+import org.neo4j.cypher.internal.compiler.v2_2.{replace, InternalException, Rewriter, bottomUp}
 
 /**
  * This rewriter ensures that WITH clauses containing a ORDER BY or WHERE are split, such that the ORDER BY or WHERE does not
@@ -41,9 +41,9 @@ case object projectFreshSortExpressions extends Rewriter {
     case clause @ With(_, _, None, _, _, None) =>
       Seq(clause)
 
-    case clause @ With(_, ri, _, _, _, _) =>
+    case clause @ With(_, ri, orderBy, _, _, where) if requiresBarrier(orderBy, where, ri.items) =>
       val duplicateProjection = ri.items.map(item =>
-        item.alias.fold(item)(alias => AliasedReturnItem(alias, alias)(item.position))
+        item.alias.fold(item)(alias => AliasedReturnItem(alias.copyId, alias.copyId)(item.position))
       )
       Seq(
         clause.copy(orderBy = None, skip = None, limit = None, where = None)(clause.position),
@@ -54,8 +54,33 @@ case object projectFreshSortExpressions extends Rewriter {
       Seq(clause)
   }
 
-  private val instance: Rewriter = Rewriter.lift {
+  private val instance: Rewriter = replace(replacer => {
+
+    case expr: Expression =>
+      replacer.stop(expr)
+
     case query @ SingleQuery(clauses) =>
       query.copy(clauses = clauses.flatMap(clauseRewriter))(query.position)
+
+    case astNode =>
+      replacer.expand(astNode)
+  })
+
+  private def orderByIdentifiers(orderBy: OrderBy): Set[Identifier] = orderBy.sortItems.flatMap {
+    case item: SortItem => item.expression.dependencies
+  }.toSet
+
+  private def whereIdentifiers(where: Where): Set[Identifier] = where.expression.dependencies
+
+  private def requiresBarrier(orderBy: Option[OrderBy], where: Option[Where], items: Seq[ReturnItem]): Boolean = {
+    val requiredIdentifiers: Set[Identifier] =
+      orderBy.map(orderByIdentifiers).getOrElse(Set.empty) ++
+      where.map(whereIdentifiers).getOrElse(Set.empty)
+
+    val preservedIdentifiers = items.collect {
+      case item: AliasedReturnItem if item.identifier == item.expression => item.identifier
+    }.toSet
+
+    (requiredIdentifiers -- preservedIdentifiers).nonEmpty
   }
 }

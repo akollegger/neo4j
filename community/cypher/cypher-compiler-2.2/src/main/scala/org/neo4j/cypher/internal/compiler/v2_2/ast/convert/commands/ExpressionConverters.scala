@@ -24,6 +24,7 @@ import org.neo4j.cypher.internal.compiler.v2_2._
 import commands.{expressions => commandexpressions, values => commandvalues, Predicate => CommandPredicate}
 import org.neo4j.cypher.internal.compiler.v2_2.commands.expressions.{Expression => CommandExpression, ProjectedPath}
 import commands.values.TokenType._
+import org.neo4j.cypher.internal.compiler.v2_2.commands.values.{UnresolvedRelType, UnresolvedProperty}
 import org.neo4j.helpers.ThisShouldNotHappenError
 import org.neo4j.cypher.internal.compiler.v2_2.ast._
 import org.neo4j.graphdb.Direction
@@ -83,6 +84,7 @@ object ExpressionConverters {
       case e: ast.ReduceExpression => e.asCommandReduce
       case e: ast.PathExpression => e.asCommandProjectedPath
       case e: ast.NestedPipeExpression => e.asPipeCommand
+      case e: ast.GetDegree => e.asCommandGetDegree
       case _ =>
         throw new ThisShouldNotHappenError("cleishm", s"Unknown expression type during transformation (${expression.getClass})")
     }
@@ -96,6 +98,13 @@ object ExpressionConverters {
         case c: commands.Predicate => c
         case c => commands.CoercedPredicate(c)
       }
+    }
+  }
+
+  implicit class GetDegreeConverter(val original: ast.GetDegree) extends AnyVal {
+    def asCommandGetDegree = {
+      val typ = original.relType.map( relType => UnresolvedRelType(relType.name))
+      commandexpressions.GetDegree(original.node.asCommandExpression, typ, original.dir)
     }
   }
 
@@ -380,7 +389,7 @@ object ExpressionConverters {
   }
 
   implicit class NestedExpressionPipeConverter(val e: ast.NestedPipeExpression) extends AnyVal {
-    def asPipeCommand: CommandExpression = commandexpressions.NestedPipe(e.pipe, e.path.asCommandProjectedPath)
+    def asPipeCommand: CommandExpression = commandexpressions.NestedPipeExpression(e.pipe, e.path.asCommandProjectedPath)
   }
 
   implicit class PathConverter(val e: ast.PathExpression) extends AnyVal {
@@ -395,14 +404,20 @@ object ExpressionConverters {
         case SingleRelationshipPathStep(Identifier(rel), Direction.INCOMING, next) =>
           singleIncomingRelationshipProjector(rel, project(next))
 
-        case SingleRelationshipPathStep(Identifier(rel), _, next) =>
+        case SingleRelationshipPathStep(Identifier(rel), Direction.OUTGOING, next) =>
           singleOutgoingRelationshipProjector(rel, project(next))
+
+        case SingleRelationshipPathStep(Identifier(rel), Direction.BOTH, next) =>
+          singleUndirectedRelationshipProjector(rel, project(next))
 
         case MultiRelationshipPathStep(Identifier(rel), Direction.INCOMING, next) =>
           multiIncomingRelationshipProjector(rel, project(next))
 
-        case MultiRelationshipPathStep(Identifier(rel), _, next) =>
+        case MultiRelationshipPathStep(Identifier(rel), Direction.OUTGOING, next) =>
           multiOutgoingRelationshipProjector(rel, project(next))
+
+        case MultiRelationshipPathStep(Identifier(rel), Direction.BOTH, next) =>
+          multiUndirectedRelationshipProjector(rel, project(next))
 
         case NilPathStep =>
           nilProjector

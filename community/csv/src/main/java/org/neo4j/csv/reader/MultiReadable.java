@@ -21,6 +21,7 @@ package org.neo4j.csv.reader;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.Reader;
 import java.util.Iterator;
 
 import org.neo4j.collection.RawIterator;
@@ -29,62 +30,92 @@ import org.neo4j.collection.RawIterator;
  * Have multiple {@link CharReadable} instances look like one. The provided {@link CharReadable readables} should
  * be opened lazily, in {@link Iterator#next()}, and will be closed in here, if they implement {@link Closeable}.
  */
-public class MultiReadable implements CharReadable, Closeable
+public class MultiReadable extends CharReadable.Adapter implements Closeable
 {
-    private final RawIterator<CharReadable,IOException> actual;
-    private CharReadable current = Readables.EMPTY;
-    private int readFromCurrent;
+    private final RawIterator<Reader,IOException> actual;
+    private Reader current;
+    private boolean requiresNewLine;
+    private long position;
 
-    public MultiReadable( RawIterator<CharReadable,IOException> actual )
+    public MultiReadable( RawIterator<Reader,IOException> actual ) throws IOException
     {
         this.actual = actual;
+        if ( actual.hasNext() )
+        {
+            current = actual.next();
+        }
     }
 
     @Override
-    public int read( char[] buffer, int offset, int length ) throws IOException
+    public SectionedCharBuffer read( SectionedCharBuffer buffer, int from ) throws IOException
     {
-        int read = 0;
-        while ( read < length )
+        buffer.compact( buffer, from );
+        while ( current != null )
         {
-            int readThisTime = current.read( buffer, offset + read, length - read );
-            if ( readThisTime == -1 )
+            buffer.readFrom( current );
+            if ( buffer.hasAvailable() )
             {
-                if ( actual.hasNext() )
-                {
-                    closeCurrent();
-                    current = actual.next();
+                position += buffer.available();
+                char lastReadChar = buffer.array()[buffer.front()-1];
+                requiresNewLine = lastReadChar != '\n' && lastReadChar != '\r';
+                return buffer;
+            }
 
-                    // Even if there's no line-ending at the end of this source we should introduce one
-                    // otherwise the last line of this source and the first line of the next source will
-                    // look like one long line.
-                    if ( readFromCurrent > 0 )
-                    {
-                        buffer[offset + read++] = '\n';
-                        readFromCurrent = 0;
-                    }
-                }
-                else
+            // Even if there's no line-ending at the end of this source we should introduce one
+            // otherwise the last line of this source and the first line of the next source will
+            // look like one long line.
+            if ( requiresNewLine )
+            {
+                buffer.append( '\n' );
+                position++;
+                requiresNewLine = false;
+                return buffer;
+            }
+
+            // Check if we've read anything at all before moving over to the new one.
+            // We do that so that we can get a "clean" move to the new source, so that
+            // information about progress and current source can be correctly provided by
+            // the caller of this method.
+            if ( actual.hasNext() )
+            {
+                closeCurrent();
+                current = actual.next();
+                for ( SourceMonitor monitor : monitors )
                 {
-                    break;
+                    monitor.notify( toString() );
                 }
             }
             else
             {
-                read += readThisTime;
-                readFromCurrent += readThisTime;
+                break;
             }
         }
-        return read == 0 ? -1 : read;
+        return buffer;
     }
 
     private void closeCurrent() throws IOException
     {
-        current.close();
+        if ( current != null )
+        {
+            current.close();
+        }
     }
 
     @Override
     public void close() throws IOException
     {
         closeCurrent();
+    }
+
+    @Override
+    public long position()
+    {
+        return position;
+    }
+
+    @Override
+    public String toString()
+    {
+        return current != null ? current.toString() : "EMPTY";
     }
 }

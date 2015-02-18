@@ -21,6 +21,7 @@ package org.neo4j.kernel.ha.com.slave;
 
 import org.junit.Test;
 
+import org.neo4j.com.IllegalProtocolVersionException;
 import org.neo4j.com.storecopy.ResponseUnpacker;
 import org.neo4j.kernel.ha.MasterClient210;
 import org.neo4j.kernel.ha.MasterClient214;
@@ -33,17 +34,14 @@ import static org.hamcrest.Matchers.instanceOf;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
 
-import static org.neo4j.com.ProtocolVersion.INTERNAL_PROTOCOL_VERSION;
-import static org.neo4j.kernel.ha.MasterClient210.PROTOCOL_VERSION;
-
 public class MasterClientResolverTest
 {
     @Test
     public void shouldResolveMasterClientFactory() throws Exception
     {
         // Given
-        MasterClientResolver resolver =
-                new MasterClientResolver( new DevNullLoggingService(), mock( ResponseUnpacker.class ), 1, 1, 1, 1024 );
+        MasterClientResolver resolver = new MasterClientResolver( new DevNullLoggingService(),
+                ResponseUnpacker.NO_OP_RESPONSE_UNPACKER, mock( InvalidEpochExceptionHandler.class ), 1, 1, 1, 1024 );
 
         LifeSupport life = new LifeSupport();
         try
@@ -58,8 +56,13 @@ public class MasterClientResolverTest
             life.shutdown();
         }
 
+        IllegalProtocolVersionException illegalProtocolVersionException = new IllegalProtocolVersionException(
+                MasterClient210.PROTOCOL_VERSION.getApplicationProtocol(),
+                MasterClient214.PROTOCOL_VERSION.getApplicationProtocol(),
+                "Protocol is too modern" );
+
         // When
-        resolver.versionMismatched( PROTOCOL_VERSION.getApplicationProtocol(), INTERNAL_PROTOCOL_VERSION );
+        resolver.handle( illegalProtocolVersionException );
 
         // Then
         life = new LifeSupport();

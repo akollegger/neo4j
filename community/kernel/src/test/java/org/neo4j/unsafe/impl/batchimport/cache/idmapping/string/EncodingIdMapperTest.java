@@ -19,15 +19,16 @@
  */
 package org.neo4j.unsafe.impl.batchimport.cache.idmapping.string;
 
+import org.junit.Rule;
+import org.junit.Test;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
-
-import org.junit.Rule;
-import org.junit.Test;
 
 import org.neo4j.function.Factory;
 import org.neo4j.graphdb.ResourceIterable;
@@ -46,14 +47,14 @@ import org.neo4j.unsafe.impl.batchimport.cache.idmapping.IdMappers;
 import org.neo4j.unsafe.impl.batchimport.input.Group;
 import org.neo4j.unsafe.impl.batchimport.input.Groups;
 
-import static java.lang.System.currentTimeMillis;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+
+import static java.lang.System.currentTimeMillis;
 
 import static org.neo4j.graphdb.Resource.EMPTY;
 import static org.neo4j.helpers.collection.IteratorUtil.resourceIterator;
@@ -188,6 +189,68 @@ public class EncodingIdMapperTest
         IdMapper mapper = new EncodingIdMapper( NumberArrayFactory.HEAP, new StringEncoder(), new Radix.String() );
         ResourceIterable<Object> ids =
                 IteratorUtil.<Object>resourceIterable( Arrays.<Object>asList( "10", "9", "10" ) );
+        Group group = new Group.Adapter( GLOBAL.id(), "global" );
+        try ( ResourceIterator<Object> iterator = ids.iterator() )
+        {
+            for ( int i = 0; iterator.hasNext(); i++ )
+            {
+                mapper.put( iterator.next(), i, group );
+            }
+        }
+
+        // WHEN
+        try
+        {
+            mapper.prepare( ids );
+            fail( "Should have failed" );
+        }
+        catch ( IllegalStateException e )
+        {
+            // THEN
+            assertTrue( e.getMessage().contains( "10" ) );
+        }
+    }
+
+    @Test
+    public void shouldIncludeSourceLocationsOfCollisions() throws Exception
+    {
+        // GIVEN
+        IdMapper mapper = new EncodingIdMapper( NumberArrayFactory.HEAP, new StringEncoder(), new Radix.String() );
+        final List<Object> idList = Arrays.<Object>asList( "10", "9", "10" );
+        ResourceIterable<Object> ids = new ResourceIterable<Object>()
+        {
+            @Override
+            public ResourceIterator<Object> iterator()
+            {
+                return new PrefetchingResourceIterator<Object>()
+                {
+                    private final Iterator<Object> idIterator = idList.iterator();
+                    private int cursor;
+
+                    @Override
+                    public void close()
+                    {   // Do nothing
+                    }
+
+                    @Override
+                    protected Object fetchNextOrNull()
+                    {
+                        if ( idIterator.hasNext() )
+                        {
+                            cursor++;
+                            return idIterator.next();
+                        }
+                        return null;
+                    }
+
+                    @Override
+                    public String toString()
+                    {
+                        return "source:" + cursor;
+                    }
+                };
+            }
+        };
         try ( ResourceIterator<Object> iterator = ids.iterator() )
         {
             for ( int i = 0; iterator.hasNext(); i++ )
@@ -206,12 +269,13 @@ public class EncodingIdMapperTest
         {
             // THEN
             assertTrue( e.getMessage().contains( "10" ) );
-            e.printStackTrace();
+            assertTrue( e.getMessage().contains( "source:1" ) );
+            assertTrue( e.getMessage().contains( "source:3" ) );
         }
     }
 
     @Test
-    public void shouldCopyWithCollisionsBasedOnDifferentInputIds() throws Exception
+    public void shouldCopeWithCollisionsBasedOnDifferentInputIds() throws Exception
     {
         // GIVEN
         Encoder encoder = mock( Encoder.class );
@@ -323,6 +387,27 @@ public class EncodingIdMapperTest
         assertEquals( -1L, mapper.get( "10", firstGroup ) );
         assertEquals( -1L, mapper.get( "10", secondGroup ) );
         assertEquals( 2L, mapper.get( "10", thirdGroup ) );
+    }
+
+    @Test
+    public void shouldHandleManyGroups() throws Exception
+    {
+        // GIVEN
+        IdMapper mapper = new EncodingIdMapper( NumberArrayFactory.HEAP, new LongEncoder(), new Radix.String() );
+        int size = 100;
+
+        // WHEN
+        for ( int i = 0; i < size; i++ )
+        {
+            mapper.put( i, i, new Group.Adapter( i, "" + i ) );
+        }
+        mapper.prepare( null ); // this test should have been set up to not run into collisions
+
+        // THEN
+        for ( int i = 0; i < size; i++ )
+        {
+            assertEquals( i, mapper.get( i, new Group.Adapter( i, "" + i ) ) );
+        }
     }
 
     private class ValueGenerator implements ResourceIterable<Object>

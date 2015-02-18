@@ -19,10 +19,11 @@
  */
 package org.neo4j.cypher.javacompat.internal;
 
+import java.util.Collections;
 import java.util.Map;
 
 import org.neo4j.cypher.CypherException;
-import org.neo4j.cypher.javacompat.ExtendedExecutionResult;
+import org.neo4j.cypher.internal.compiler.v2_2.executionplan.InternalExecutionResult;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.kernel.impl.util.StringLogger;
 
@@ -33,7 +34,7 @@ import static org.neo4j.kernel.impl.util.StringLogger.DEV_NULL;
  */
 public class DocsExecutionEngine
 {
-    private org.neo4j.cypher.ExecutionEngine inner;
+    private org.neo4j.cypher.internal.DocsExecutionEngine inner;
 
     /**
      * Creates an execution engine around the give graph database
@@ -41,18 +42,18 @@ public class DocsExecutionEngine
      */
     public DocsExecutionEngine( GraphDatabaseService database )
     {
-        inner = createInnerEngine( database, DEV_NULL );
+        this( database, DEV_NULL );
     }
 
     /**
      * Creates an execution engine around the give graph database
-     * 
+     *
      * @param database The database to wrap
      * @param logger A logger for cypher-statements
      */
     public DocsExecutionEngine( GraphDatabaseService database, StringLogger logger )
     {
-        inner = createInnerEngine( database, logger );
+        inner = (org.neo4j.cypher.internal.DocsExecutionEngine) createInnerEngine( database, logger );
     }
 
     protected
@@ -68,9 +69,9 @@ public class DocsExecutionEngine
      * @throws org.neo4j.cypher.SyntaxException If the Query contains errors,
      * a SyntaxException exception might be thrown
      */
-    public ExtendedExecutionResult execute( String query ) throws CypherException
+    public InternalExecutionResult execute( String query ) throws CypherException
     {
-        return new ExtendedExecutionResult( inner.execute( query ) );
+        return (InternalExecutionResult) inner.internalExecute( query, Collections.<String, Object> emptyMap() );
     }
 
     /**
@@ -81,9 +82,9 @@ public class DocsExecutionEngine
      * @throws org.neo4j.cypher.SyntaxException If the Query contains errors,
      * a SyntaxException exception might be thrown
      */
-    public ExtendedExecutionResult execute( String query, Map<String, Object> params) throws CypherException
+    public InternalExecutionResult execute( String query, Map<String,Object> params ) throws CypherException
     {
-        return new ExtendedExecutionResult( inner.execute( query, params ) );
+        return (InternalExecutionResult) inner.internalExecute( query, params );
     }
 
     /**
@@ -97,9 +98,9 @@ public class DocsExecutionEngine
      * @throws org.neo4j.cypher.SyntaxException If the Query contains errors,
      * a SyntaxException exception might be thrown
      */
-    public ExtendedExecutionResult profile( String query ) throws CypherException
+    public InternalExecutionResult profile( String query ) throws CypherException
     {
-        return new ExtendedExecutionResult( inner.profile( query ) );
+        return (InternalExecutionResult) inner.internalProfile( query, Collections.<String, Object> emptyMap() );
     }
 
     /**
@@ -114,9 +115,9 @@ public class DocsExecutionEngine
      * @throws org.neo4j.cypher.SyntaxException If the Query contains errors,
      * a SyntaxException exception might be thrown
      */
-    public ExtendedExecutionResult profile( String query, Map<String, Object> params) throws CypherException
+    public InternalExecutionResult profile( String query, Map<String,Object> params ) throws CypherException
     {
-        return new ExtendedExecutionResult( inner.profile( query, params ) );
+        return (InternalExecutionResult) inner.internalProfile( query, params );
     }
 
     /**

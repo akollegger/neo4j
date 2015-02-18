@@ -34,7 +34,7 @@ import scala.math._
  * returning the matching top results, we only keep the top results in heap, which allows us to release memory earlier
  */
 case class TopPipe(source: Pipe, sortDescription: List[SortItem], countExpression: Expression)
-                  (val estimatedCardinality: Option[Long] = None)(implicit pipeMonitor: PipeMonitor)
+                  (val estimatedCardinality: Option[Double] = None)(implicit pipeMonitor: PipeMonitor)
   extends PipeWithSource(source, pipeMonitor) with Comparer with RonjaPipe {
 
   val sortItems = sortDescription.toArray
@@ -66,6 +66,9 @@ case class TopPipe(source: Pipe, sortDescription: List[SortItem], countExpressio
   def arrayEntry(ctx : ExecutionContext)(implicit qtx : QueryState) : SortDataWithContext = (sortItems.map(_(ctx)),ctx)
 
   protected def internalCreateResults(input:Iterator[ExecutionContext], state: QueryState): Iterator[ExecutionContext] = {
+    //register as parent so that stats are associated with this pipe
+    state.decorator.registerParentPipe(this)
+
     implicit val s = state
     if (input.isEmpty)
       Iterator.empty
@@ -115,12 +118,14 @@ case class TopPipe(source: Pipe, sortDescription: List[SortItem], countExpressio
 
   def symbols = source.symbols
 
-  override def effects = Effects.NONE
+  // the top pipe has no effects since it is at the top
+  override val localEffects = Effects.NONE
+  override val effects = Effects.NONE
 
   def dup(sources: List[Pipe]): Pipe = {
     val (head :: Nil) = sources
     copy(source = head)(estimatedCardinality)
   }
 
-  def withEstimatedCardinality(estimated: Long) = copy()(Some(estimated))
+  def withEstimatedCardinality(estimated: Double) = copy()(Some(estimated))
 }

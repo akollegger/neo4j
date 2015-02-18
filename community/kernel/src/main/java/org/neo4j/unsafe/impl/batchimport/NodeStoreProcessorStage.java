@@ -32,7 +32,7 @@ public class NodeStoreProcessorStage extends Stage
     public NodeStoreProcessorStage( String name, Configuration config, NodeStore store,
             StoreProcessor<NodeRecord> processor )
     {
-        super( name, config );
+        super( name, config, true );
         add( new NodeStoreProcessorStep( control(), name, config, store, processor ) );
     }
 }

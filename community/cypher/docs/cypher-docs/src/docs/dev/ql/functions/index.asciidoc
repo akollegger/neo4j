@@ -44,6 +44,8 @@ include::includes/cypher-functions-graph.asciidoc[]
 
 include::length.asciidoc[]
 
+include::length-of-pattern-expression.asciidoc[]
+
 include::type.asciidoc[]
 
 include::id.asciidoc[]
@@ -85,6 +87,8 @@ include::nodes.asciidoc[]
 include::relationships.asciidoc[]
 
 include::labels.asciidoc[]
+
+include::keys.asciidoc[]
 
 include::extract.asciidoc[]
 

@@ -21,8 +21,38 @@ package org.neo4j.cypher
 
 import org.neo4j.cypher.internal.PathImpl
 import org.neo4j.graphdb._
+import scala.collection.JavaConverters._
 
 class MatchAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTestSupport with NewPlannerTestSupport {
+
+  test("Get node degree via length of pattern expression") {
+    val node = createLabeledNode("X")
+    relate(node, createNode())
+    relate(node, createNode())
+    relate(node, createNode())
+
+    executeScalarWithNewPlanner[Int]("MATCH (a:X) RETURN length(a-->())") should equal(3)
+  }
+
+  test("Get node degree via length of pattern expression that specifies a relationship type") {
+    val node = createLabeledNode("X")
+    relate(node, createNode())
+    relate(node, createNode())
+    relate(node, createNode())
+    relate(node, createNode(), "AFFE")
+
+    executeScalarWithNewPlanner[Int]("MATCH (a:X) RETURN length(a-[:REL]->())") should equal(3)
+  }
+
+  test("Get node degree via length of pattern expression that specifies multiple relationship types") {
+    val node = createLabeledNode("X")
+    relate(node, createNode())
+    relate(node, createNode())
+    relate(node, createNode())
+    relate(node, createNode(), "AFFE")
+
+    executeScalarWithNewPlanner[Int]("MATCH (a:X) RETURN length(a-[:REL|AFFE]->())") should equal(4)
+  }
 
   test("should be able to use multiple MATCH clauses to do a cartesian product") {
     createNode("value" -> 1)
@@ -1744,7 +1774,6 @@ return b
                   |  MERGE (project)–[:HAS_FOLDER]->(folder))
                   |RETURN DISTINCT project""".stripMargin
 
-
     //WHEN
     val first = eengine.execute(query).toList
     val second = eengine.execute(query).toList
@@ -1777,5 +1806,100 @@ return b
 
     //THEN
     result.toList should equal (List(Map("host" -> host), Map("host" -> null)))
+  }
+
+  test("Undirected paths should be properly handled") {
+    //GIVEN
+    val node1 = createLabeledNode("Movie")
+    val node2 = createNode()
+    val rel = relate(node2, node1)
+
+    val query =
+      """profile match p = (n:Movie)--(m) return p limit 1""".stripMargin
+
+    graph.inTx {
+      val res = executeWithNewPlanner(query).toList
+      val path = res.head("p").asInstanceOf[Path]
+      path.startNode should equal(node1)
+      path.endNode should equal(node2)
+    }
+  }
+
+  test("named paths should work properly with WITH") {
+    val a = createNode()
+    val query = """MATCH p = (a)
+                  |WITH p
+                  |RETURN p
+                  | """.stripMargin
+
+    val result = executeWithNewPlanner(query).toList
+    result should equal(List(Map("p" -> PathImpl(a))))
+  }
+
+  test("Named paths with directed followed by undirected relationships") {
+    //GIVEN
+    val node1 = createNode()
+    val node2 = createNode()
+    val node3 = createNode()
+    val twoToOne = relate(node2, node1)
+    val threeToTwo = relate(node3, node2)
+    val query =
+      """match p = (n)-->(m)--(o) return p""".stripMargin
+
+    //WHEN
+    val res = executeWithNewPlanner(query).toList
+
+    //THEN
+    graph.inTx {
+      val path = res.head("p").asInstanceOf[Path]
+      path.startNode should equal(node3)
+      path.endNode should equal(node1)
+
+      path.nodes().asScala.toList should equal(Seq(node3, node2, node1))
+      path.relationships().asScala.toList should equal(Seq(threeToTwo, twoToOne))
+    }
+  }
+
+  test("Named paths with directed followed by multiple undirected relationships") {
+    //GIVEN
+    val node1 = createNode()
+    val node2 = createNode()
+    val node3 = createNode()
+    val node4 = createNode()
+    val twoToOne = relate(node2, node1)
+    val threeToTwo = relate(node3, node2)
+    val fourToThree = relate(node4, node3)
+    val query =
+      """match path = (n)-->(m)--(o)--(p) return path""".stripMargin
+
+    //WHEN
+    val res = executeWithNewPlanner(query).toList
+
+    //THEN
+    graph.inTx {
+      val path = res.head("path").asInstanceOf[Path]
+      path.startNode should equal(node4)
+      path.endNode should equal(node1)
+
+      path.nodes().asScala.toList should equal(Seq(node4, node3, node2, node1))
+      path.relationships().asScala.toList should equal(Seq(fourToThree, threeToTwo, twoToOne))
+    }
+  }
+
+  test("should handle cartesian products even when same argument exists on both sides") {
+    val node1 = createNode()
+    val node2 = createNode()
+    val r = relate(node1, node2)
+
+    val query = """PLANNER COST WITH [{0}, {1}] AS x, count(*) as y
+                  |MATCH (n) WHERE ID(n) IN x
+                  |MATCH (m) WHERE ID(m) IN x
+                  |MATCH paths = allShortestPaths((n)-[*..1]-(m))
+                  |RETURN paths""".stripMargin
+
+    val result = executeWithNewPlanner(query, "0" -> node1.getId, "1" -> node2.getId)
+    graph.inTx(
+      result.toSet should equal(Set(Map("paths" -> new PathImpl(node1, r, node2)), Map("paths" -> new PathImpl(node2, r, node1))))
+    )
   }
 }

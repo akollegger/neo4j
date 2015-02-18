@@ -24,15 +24,14 @@ import java.util.Map;
 
 import org.neo4j.csv.reader.CharSeeker;
 import org.neo4j.function.Function;
-import org.neo4j.graphdb.ResourceIterable;
-import org.neo4j.graphdb.ResourceIterator;
+import org.neo4j.unsafe.impl.batchimport.InputIterable;
+import org.neo4j.unsafe.impl.batchimport.InputIterator;
 import org.neo4j.unsafe.impl.batchimport.cache.idmapping.IdGenerator;
 import org.neo4j.unsafe.impl.batchimport.cache.idmapping.IdMapper;
 import org.neo4j.unsafe.impl.batchimport.input.Groups;
 import org.neo4j.unsafe.impl.batchimport.input.Input;
 import org.neo4j.unsafe.impl.batchimport.input.InputNode;
 import org.neo4j.unsafe.impl.batchimport.input.InputRelationship;
-import org.neo4j.unsafe.impl.batchimport.store.BatchingIdSequence;
 
 /**
  * Provides {@link Input} from data contained in tabular/csv form. Expects factories for instantiating
@@ -47,8 +46,6 @@ public class CsvInput implements Input
     private final Header.Factory relationshipHeaderFactory;
     private final IdType idType;
     private final Configuration config;
-    private final int[] delimiter;
-    private final BatchingIdSequence relationshipIds = new BatchingIdSequence();
     private final Groups groups = new Groups();
 
     /**
@@ -76,7 +73,6 @@ public class CsvInput implements Input
         this.relationshipHeaderFactory = relationshipHeaderFactory;
         this.idType = idType;
         this.config = config;
-        this.delimiter = new int[] {config.delimiter()};
     }
 
     private void assertSaneConfiguration( Configuration config )
@@ -98,21 +94,21 @@ public class CsvInput implements Input
     }
 
     @Override
-    public ResourceIterable<InputNode> nodes()
+    public InputIterable<InputNode> nodes()
     {
-        return new ResourceIterable<InputNode>()
+        return new InputIterable<InputNode>()
         {
             @Override
-            public ResourceIterator<InputNode> iterator()
+            public InputIterator<InputNode> iterator()
             {
                 return new InputGroupsDeserializer<InputNode>( nodeDataFactory.iterator(),
                         nodeHeaderFactory, config, idType )
                 {
                     @Override
-                    protected ResourceIterator<InputNode> entityDeserializer( CharSeeker dataStream, Header dataHeader,
+                    protected InputIterator<InputNode> entityDeserializer( CharSeeker dataStream, Header dataHeader,
                             Function<InputNode,InputNode> decorator )
                     {
-                        return new InputNodeDeserializer( dataHeader, dataStream, delimiter, decorator,
+                        return new InputNodeDeserializer( dataHeader, dataStream, config.delimiter(), decorator,
                                 idType.idsAreExternal(), groups );
                     }
                 };
@@ -121,23 +117,22 @@ public class CsvInput implements Input
     }
 
     @Override
-    public ResourceIterable<InputRelationship> relationships()
+    public InputIterable<InputRelationship> relationships()
     {
-        return new ResourceIterable<InputRelationship>()
+        return new InputIterable<InputRelationship>()
         {
             @Override
-            public ResourceIterator<InputRelationship> iterator()
+            public InputIterator<InputRelationship> iterator()
             {
-                relationshipIds.reset();
                 return new InputGroupsDeserializer<InputRelationship>( relationshipDataFactory.iterator(),
                         relationshipHeaderFactory, config, idType )
                 {
                     @Override
-                    protected ResourceIterator<InputRelationship> entityDeserializer( CharSeeker dataStream,
+                    protected InputIterator<InputRelationship> entityDeserializer( CharSeeker dataStream,
                               Header dataHeader, Function<InputRelationship,InputRelationship> decorator )
                     {
-                        return new InputRelationshipDeserializer( dataHeader, dataStream, delimiter,
-                                relationshipIds, decorator, groups );
+                        return new InputRelationshipDeserializer( dataHeader, dataStream, config.delimiter(),
+                                decorator, groups );
                     }
                 };
             }
@@ -154,5 +149,11 @@ public class CsvInput implements Input
     public IdGenerator idGenerator()
     {
         return idType.idGenerator();
+    }
+
+    @Override
+    public boolean specificRelationshipIds()
+    {
+        return false;
     }
 }

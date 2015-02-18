@@ -36,7 +36,10 @@ case object inlineProjections extends Rewriter {
     val inlineReturnItemsInWith = Rewriter.lift(aliasedReturnItemRewriter(inlineIdentifiers.narrowed, context, inlineAliases = true))
     val inlineReturnItemsInReturn = Rewriter.lift(aliasedReturnItemRewriter(inlineIdentifiers.narrowed, context, inlineAliases = false))
 
-    val inliningRewriter: Rewriter = Rewriter.lift {
+    val inliningRewriter: Rewriter = replace(replacer => {
+      case expr: Expression =>
+        replacer.stop(expr)
+
       case withClause: With if !withClause.distinct =>
         withClause.copy(
           returnItems = withClause.returnItems.rewrite(inlineReturnItemsInWith).asInstanceOf[ReturnItems],
@@ -61,9 +64,12 @@ case object inlineProjections extends Rewriter {
 
       case clause: Clause =>
         inlineIdentifiers.narrowed(clause)
-    }
 
-    input.endoRewrite(topDown(inliningRewriter))
+      case astNode =>
+        replacer.expand(astNode)
+    })
+
+    input.endoRewrite(inliningRewriter)
   }
 
   private def findAllDependencies(identifier: Identifier, context: InliningContext): Set[Identifier] = {
@@ -88,13 +94,13 @@ case object inlineProjections extends Rewriter {
     case ri: ReturnItems =>
       val newItems = ri.items.flatMap {
         case item: AliasedReturnItem
-          if context.projections.contains(item.identifier) && inlineAliases =>
+          if context.okToRewrite(item.identifier) && inlineAliases =>
           val dependencies = findAllDependencies(item.identifier, context)
           if (dependencies == Set(item.identifier)) {
             Seq(item)
           } else {
             dependencies.map { id =>
-              AliasedReturnItem(id.copy()(id.position), id.copy()(id.position))(item.position)
+              AliasedReturnItem(id.copyId, id.copyId)(item.position)
             }.toSeq
           }
         case item: AliasedReturnItem => Seq(

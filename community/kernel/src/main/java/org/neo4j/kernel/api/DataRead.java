@@ -101,6 +101,10 @@ interface DataRead
      */
     PrimitiveIntIterator nodeGetLabels( long nodeId ) throws EntityNotFoundException;
 
+    PrimitiveLongIterator nodeGetAllPropertiesKeys( long nodeId ) throws EntityNotFoundException;
+
+    PrimitiveLongIterator relationshipGetAllPropertiesKeys( long relationshipId ) throws EntityNotFoundException;
+
     PrimitiveIntIterator nodeGetRelationshipTypes( long nodeId ) throws EntityNotFoundException;
 
     Property nodeGetProperty( long nodeId, int propertyKeyId ) throws EntityNotFoundException;
@@ -149,4 +153,12 @@ interface DataRead
                      /* Outputs */ NeoRegister.Relationship.Out relId, NeoRegister.RelType.Out relType,
                                    Register.Object.Out<Direction> direction,
                                    NeoRegister.Node.Out startNodeId, NeoRegister.Node.Out neighborNodeId );
+
+    Cursor nodeGetRelationships( long nodeId, Direction direction,
+                                 RelationshipVisitor<? extends RuntimeException> visitor )
+            throws EntityNotFoundException;
+
+    Cursor nodeGetRelationships( long nodeId, Direction direction, int[] types,
+                                 RelationshipVisitor<? extends RuntimeException> visitor )
+            throws EntityNotFoundException;
 }
