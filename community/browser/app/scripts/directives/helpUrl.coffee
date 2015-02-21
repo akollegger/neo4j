@@ -29,6 +29,8 @@ angular.module('neo4jApp.directives')
         code = e.currentTarget.textContent or e.currentTarget.innerText
         return unless code?.length > 0
         Editor.setContent(code.trim())
+        angular.element(e.currentTarget).addClass('clicked')
+
         $rootScope.$apply() unless $rootScope.$$phase
 
   ])
