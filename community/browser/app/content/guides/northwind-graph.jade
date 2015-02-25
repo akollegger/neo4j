@@ -14,8 +14,73 @@ article.guide
         p This guide will show you how to:
         ol.big
           li Load: create data from external CSV files
+          li Index: index nodes based on label
           li Relate: transform foreign key references into data relationships
           li Promote: transform join records into relationships
+    slide.row-fluid
+      .col-sm-3
+        h3 Load Products and Categories
+        p First, load records directly into Neo4j without 
+          i  any
+          |  transformation. Each record becomes a node, labeled according to the originating
+          | table name. This will create an unconnected graph which is an exact replica of
+          | the orignal relational tables. 
+        h4 How-to
+        p To the right is a series of data load statements which require public internet
+          | access. 
+          code LOAD CSV
+          |  will retrieve a CSV file from a valid URL, applying a Cypher statement to
+          | each row using a named map (here we're using the name `row`).
+        p Do this:
+        ol
+          li Click on each code block
+          li Notice it gets copied to the editor above &uarr;
+          li Click the editor's play button to execute
+          li Wait for the query to finish, then repeat with the next one
+        p.text-center.text-warning.bg-warning WARNING: This adds data to the current database, each time it is run!
+        hr
+        p
+          small :help
+          | &nbsp;
+          a(help-topic='cypher') cypher
+          | &nbsp;
+          a(help-topic='create') LOAD CSV
+      .col-sm-9
+        h4 Load Product Information
+        figure
+          pre.pre-scrollable.code.runnable.
+            LOAD CSV WITH HEADERS FROM "https://raw.githubusercontent.com/neo4j-contrib/northwind-neo4j/master/data/products.csv" AS row
+            CREATE (n:Product)
+            SET n = row, 
+              n.ProductID = toInt(row.ProductID), n.SupplierID = toInt(row.SupplierID), n.CategoryID = toInt(row.CategoryID), n.UnitPrice = toFloat(row.UnitPrice),
+              n.UnitsInStock = toInt(row.UnitsInStock), n.UnitsOnOrder = toInt(row.UnitsOnOrder), n.ReorderLevel = toInt(row.ReorderLevel), n.Discontinued = (row.Discontinued &lt;&gt; "0")
+        figure
+          pre.pre-scrollable.code.runnable.
+            LOAD CSV WITH HEADERS FROM "https://raw.githubusercontent.com/neo4j-contrib/northwind-neo4j/master/data/categories.csv" AS row
+            CREATE (n:Category)
+            SET n = row, n.CategoryID = toInt(row.CategoryID)
+        figure
+          pre.pre-scrollable.code.runnable.
+            LOAD CSV WITH HEADERS FROM "https://raw.githubusercontent.com/neo4j-contrib/northwind-neo4j/master/data/suppliers.csv" AS row
+            CREATE (n:Supplier)
+            SET n = row,
+                n.SupplierID = toInt(row.SupplierID)
+        h4 Create Indexes
+        figure
+          pre.pre-scrollable.code.runnable.
+            CREATE INDEX ON :Product(productID)
+        figure
+          pre.pre-scrollable.code.runnable.
+            CREATE INDEX ON :Category(categoryID)
+        figure
+          pre.pre-scrollable.code.runnable.
+            CREATE INDEX ON :Supplier(supplierID)
+        h4 Relate records
+          pre.pre-scrollable.code.runnable.
+            MATCH (p:Product),(c:Category)
+            WHERE p.CategoryID = c.CategoryID
+            CREATE (p)-[:PART_OF]-&gt;(c)
+          
     slide.row-fluid
       .col-sm-3
         h3 Load Records
@@ -121,6 +186,7 @@ article.guide
                 n.TerritoryID = toInt(row.TerritoryID),
                 n.RegionID = toInt(row.RegionID)
           figcaption Load the sales territories.
+                    
                     
     slide.row-fluid
       .col-sm-3
