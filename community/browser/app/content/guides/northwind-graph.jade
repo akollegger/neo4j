@@ -4,7 +4,7 @@ article.guide
       .col-sm-3
         h3 Northwind Graph
         p.lead From RDBMS to Graph, using a classic dataset
-      .col-sm-9
+      .col-sm-6
         p
           em The Northwind Graph
           | &nbsp; demonstrates how to migrate from a 
@@ -17,27 +17,28 @@ article.guide
           li Index: index nodes based on label
           li Relate: transform foreign key references into data relationships
           li Promote: transform join records into relationships
-    slide.row-fluid
       .col-sm-3
-        h3 Load Products and Categories
-        p First, load records directly into Neo4j without 
-          i  any
-          |  transformation. Each record becomes a node, labeled according to the originating
-          | table name. This will create an unconnected graph which is an exact replica of
-          | the orignal relational tables. 
         h4 How-to
-        p To the right is a series of data load statements which require public internet
-          | access. 
-          code LOAD CSV
-          |  will retrieve a CSV file from a valid URL, applying a Cypher statement to
-          | each row using a named map (here we're using the name `row`).
         p Do this:
         ol
           li Click on each code block
           li Notice it gets copied to the editor above &uarr;
           li Click the editor's play button to execute
           li Wait for the query to finish, then repeat with the next one
+
         p.text-center.text-warning.bg-warning WARNING: This adds data to the current database, each time it is run!
+    slide.row-fluid
+      .col-sm-3
+        h3 Product Catalog
+        p Northwind sells food products in a few categories, provided by international suppliers.
+          | Let's start by loading just the products, categories and suppliers to see how that
+          | looks as a graph. 
+        p The load statements to the right require public internet access. 
+          code LOAD CSV
+          |  will retrieve a CSV file from a valid URL, applying a Cypher statement to
+          | each row using a named map (here we're using the name `row`).
+        p
+          img.img-responsive(src='images/northwind/product-category-supplier.png')
         hr
         p
           small :help
@@ -46,7 +47,7 @@ article.guide
           | &nbsp;
           a(help-topic='create') LOAD CSV
       .col-sm-9
-        h4 Load Product Information
+        h4 Load Records
         figure
           pre.pre-scrollable.code.runnable.
             LOAD CSV WITH HEADERS FROM "http://data.neo4j.com/northwind/products.csv" AS row
@@ -75,11 +76,31 @@ article.guide
         figure
           pre.pre-scrollable.code.runnable.
             CREATE INDEX ON :Supplier(supplierID)
+    slide.row-fluid
+      .col-sm-3
+        h3 Product Catalog Graph
+        p The products, categories and suppliers are related through foreign key references. 
+          | Let's promote those to data relationships to realize the graph, then try some
+          | queries using patterns.
+        p
+          img.img-responsive(src='images/northwind/product-category-supplier.png')
+        hr
+        p
+          small :help
+          | &nbsp;
+          a(help-topic='cypher') cypher
+          | &nbsp;
+          a(help-topic='create') LOAD CSV
+      .col-sm-9
         h4 Relate records
           pre.pre-scrollable.code.runnable.
             MATCH (p:Product),(c:Category)
             WHERE p.CategoryID = c.CategoryID
             CREATE (p)-[:PART_OF]-&gt;(c)
+          pre.pre-scrollable.code.runnable.
+            MATCH (p:Product),(s:Supplier)
+            WHERE p.SupplierID = s.SupplierID
+            CREATE (s)-[:SUPPLIES]-&gt;(p)
           
     slide.row-fluid
       .col-sm-3
