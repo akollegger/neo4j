@@ -27,9 +27,12 @@ angular.module('neo4jApp.controllers')
     'Frame'
     'Settings'
     ($scope, Settings) ->
-      $scope.nodeLabel = "Person"
-      $scope.propertyKey = "name"
+      $scope.nodeLabelA = "Person"
+      $scope.propertyKeyA = "name"
       $scope.propertyValueA = "Ann"
+      $scope.nodeLabelB = "Person"
+      $scope.propertyKeyB = "name"
       $scope.propertyValueB = "Dan"
       $scope.relationshipType = "KNOWS"
+      $scope.relationshipDepth = 3
   ]

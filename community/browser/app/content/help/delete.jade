@@ -13,7 +13,7 @@ article.help
           code MATCH
           |  clause, possibly qualified by a&nbsp;
           code WHERE
-          | .
+          | . Note that a node can only be deleted if it has no relationships.
         table.table-condensed.table-help
           tr
             th Reference:
@@ -29,8 +29,6 @@ article.help
               a(help-topic='where') :help WHERE
               | &nbsp;
               a(help-topic='remove') :help RETURN
-              | &nbsp;
-              a(help-topic='create') :help REMOVE
               | &nbsp;
               a(help-topic='cypher') :help Cypher
     section.row-fluid.example

@@ -2,11 +2,8 @@ article.guide(ng-controller="AdLibDataController")
   carousel.deck.container-fluid
     slide.row-fluid
       .col-sm-4
-        h3 Nodes
-        p
-          span(ng-repeat='node in labels | orderBy: identity')
-            a.badge(ng-click="editor.execScript('MATCH (n:`'+node+'`) RETURN n LIMIT 25')") {{node}}
-
+        h3 Query Template - Create
+        p.lead Generate nodes and relationships
         form
           .node
             .form-group

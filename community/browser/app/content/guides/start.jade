@@ -8,14 +8,16 @@ article.guide
       .col-sm-4
         .btn.btn-default.btn-app(ng-click="whichTab = 'learn'")
           img(src="images/learn-icon.png")
-          figcaption Learn
+          p.caption-cta
+            a(play-topic='concepts') Learn
         .btn.btn-default.btn-app(ng-click="whichTab = 'code'")
           img(src="images/code-icon.png")
-          figcaption Code
-        .btn.btn-default.btn-app(ng-click="whichTab = 'data'")
-          img(src="images/data-icon.png")
-          figcaption Data
-              
+          p.caption-cta
+            a(play-topic='write-code') Code
+        //- .btn.btn-default.btn-app(ng-click="whichTab = 'explore'")
+        //-   img(src="images/data-icon.png")
+        //-   p.caption-cta
+        //-     a(play-topic='explore') Explore
             
       .col-sm-4(ng-switch="whichTab")
         div(ng-switch-default)
@@ -26,25 +28,25 @@ article.guide
             li How can I query a graph?
             li What do people do with Neo4j?
           p &nbsp;
-          button.btn.btn-cta(play-topic='concepts') Start Learning (5 minutes)
+          button.btn.btn-cta(play-topic='concepts') Start Learning (5 brief minutes)
         div(ng-switch-when="code")
           h3 Jump into code
           p.lead Use Cypher, the graph query language.
           ul
-            li Code walk-through of a graph app
-            li Create a graph by connecting data
-            li Query with patterns 
+            li Code walk-throughs
+            li RDBMS to Graph
+            li Query templates 
           p &nbsp;
-          button.btn.btn-cta(play-topic='movie-graph') Write Code (10 minutes)
-        div(ng-switch-when="data")
-          h3 Load graph data
-          p.lead Create and explore sample datasets.
-          ul
-            li Uses: MDM, IAM, Social, Recommendations
-            li Industries: 
-            li Fun: Movies, 
-          p &nbsp;
-          button.btn.btn-cta(play-topic='load-data') Choose a Graph
+          button.btn.btn-cta(play-topic='write-code') Write Code (10-30 solid minutes)
+        //- div(ng-switch-when="explore")
+        //-   h3 Explore current graph
+        //-   p.lead Introspective Cypher queries.
+        //-   ul
+        //-     li Nodes by label, relationships by type
+        //-     li What is related, and how
+        //-     li Count all the things
+        //-   p &nbsp;
+        //-   button.btn.btn-cta(play-topic='explore') Explore (many enjoyable minutes)
     .row.empty
           
     footer.tight
