@@ -1,10 +1,71 @@
 article.guide
   .container-fluid
     .row
-      .col-sm-4
+      .col-sm-2
         .box-max
           img.img-responsive(src='images/neo4j-world.png')
           p.lead.text-center {{ neo4j.version }}
+      .col-sm-10
+        #widgets
+          .row
+            .widget(ng-controller="ExpandoController", ng-class="{'col-xs-1':expansionState=='min', 'col-xs-4':expansionState=='med', 'col-xs-8':expansionState=='max'}")
+              .btn-group-vertical
+                span.btn.fa-stack(ng-click='minimize()')
+                  i.fa.fa-circle.fa-stack-1x
+                  i.fa.fa-angle-up.fa-stack-1x.fa-inverse
+                span.btn.fa-stack(ng-click='mediumize()')
+                  i.fa.fa-circle.fa-stack-1x
+                  i.fa.fa-angle-down.fa-stack-1x.fa-inverse
+                span.btn.fa-stack(ng-click='maximize()')
+                  i.fa.fa-circle.fa-stack-1x
+                  i.fa.fa-angle-double-down.fa-stack-1x.fa-inverse
+              .well
+                .row
+                  .col-sm-4
+                    .btn.btn-default.btn-app
+                      img(src="images/learn-icon.png")
+                      p.caption-cta
+                        a(play-topic='concepts') Learn
+                  .col-sm-8
+                    h3 Learn about Neo4j
+                    p.lead A graph epiphany awaits you.
+                    ul
+                      li What is a graph database?
+                      li How can I query a graph?
+                      li What do people do with Neo4j?
+                .row(ng-hide='expansionState=="min"')
+                  .col-sm-12
+                    button.btn.btn-cta(play-topic='concepts') Start Learning (5 brief minutes)
+            .widget.col-xs-4
+              .well
+                .btn.btn-default.btn-app
+                  img(src="images/code-icon.png")
+                  p.caption-cta
+                    a(play-topic='write-code') Code
+                h3 Jump into code
+                p.lead Use Cypher, the graph query language.
+                ul
+                  li Code walk-throughs
+                  li RDBMS to Graph
+                  li Query templates 
+                p &nbsp;
+                button.btn.btn-cta(play-topic='write-code') Write Code (10-30 solid minutes)
+            .widget.col-xs-4
+              .well
+                .btn.btn-default.btn-app
+                  img(src="images/health-icon.png")
+                  p.caption-cta
+                    a(play-topic='sysinfo') Monitor
+                h3 Monitor the system
+                p.lead Key system health and status metrics.
+                ul
+                  li Disk utilization
+                  li Cache activity
+                  li Cluster health and status
+                p &nbsp;
+                button.btn.btn-cta(play-topic='sysinfo') Monitor (many meaningful minutes)
+
+    .row(ng-show='false')
       .col-sm-4
         .btn.btn-default.btn-app(ng-click="whichTab = 'learn'")
           img(src="images/learn-icon.png")
