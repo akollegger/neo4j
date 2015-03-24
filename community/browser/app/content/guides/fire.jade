@@ -1,0 +1,21 @@
+article.guide
+  carousel.deck.container-fluid
+    slide.row-fluid
+      .col-sm-4
+        h3 Neo4j Browser Fire
+        p.lead Experiments with Firebase
+      .col-sm-8(ng-controller="FireController")
+        form
+          .node
+            .form-group
+              label Name
+              input.form-control(ng-model='firename')
+            .form-group
+              label Message
+              input.form-control(ng-model='firechat')
+            .button.btn.btn-default(ng-click='send()') Send
+        .hero-unit
+          p(ng-repeat="message in messages")
+            b {{message.name}}
+            | : &nbsp;
+            | {{message.text}}

@@ -23,9 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 angular.module('neo4jApp.controllers')
   .controller 'AdLibDataController', [
     '$scope'
-    'AuthService'
-    'Frame'
-    'Settings'
     ($scope, Settings) ->
       $scope.nodeLabelA = "Person"
       $scope.propertyKeyA = "name"
