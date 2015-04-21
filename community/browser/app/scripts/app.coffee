@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 angular.module('neo4jApp.controllers', ['neo4jApp.utils'])
 angular.module('neo4jApp.directives', ['ui.bootstrap.modal'])
 angular.module('neo4jApp.filters', [])
-angular.module('neo4jApp.services', ['LocalStorageModule', 'neo4jApp.settings', 'neo4jApp.utils', 'base64'])
+angular.module('neo4jApp.services', ['LocalStorageModule', 'neo4jApp.settings', 'neo4jApp.utils', 'base64', 'angular-jwt'])
 
 app = angular.module('neo4jApp', [
   'ngAnimate'
@@ -42,6 +42,17 @@ app = angular.module('neo4jApp', [
   'ui.bootstrap.carousel'
   'ui.codemirror'
   'ui.sortable'
-  #'angularMoment'
+  'angularMoment'
   'ngSanitize'
+  'auth0'
+  'angular-jwt'
+  'firebase'
 ])
+.config((authProvider) ->
+  authProvider.init(
+    domain: 'hanelabs.auth0.com'
+    clientID: 'lWhypa70vXqCjkVTIqv58yhbBxAngljr'
+  )
+).run((auth) ->
+  auth.hookEvents()
+)

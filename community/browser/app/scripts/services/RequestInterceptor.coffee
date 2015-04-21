@@ -18,15 +18,22 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ###
 
-'use strict';
+'use strict'
 
 angular.module('neo4jApp.services')
   .factory('RequestInterceptor', [
     'AuthDataService'
-    (AuthDataService) ->
+    'Settings'
+    (AuthDataService, Settings) ->
+      isRequestToNeo4jServer = (url) ->
+        return yes unless /^https?:/.test(url)
+        return yes if Settings.host.length > 0 and url.indexOf(Settings.host) != -1
+        return no
+
       interceptor =
         request: (config) ->
           return config if config.skipAuthHeader
+          return config unless isRequestToNeo4jServer config.url
           header = AuthDataService.getAuthData()
           if header then config.headers['Authorization'] = "Basic #{header}"
           config
