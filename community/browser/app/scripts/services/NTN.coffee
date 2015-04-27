@@ -26,7 +26,7 @@ angular.module('neo4jApp.services')
   (auth, Settings, $q, $firebaseAuth, $firebaseObject) ->
 
     _getUserStore = (id, token) ->
-      ref = new Firebase("https://fiery-heat-7952.firebaseio.com/users/#{id}")
+      ref = new Firebase("https://fiery-heat-7952.firebaseio.com/users/#{id}/")
       fbauth = $firebaseAuth ref
       fbauth.$authWithCustomToken token
       ref
@@ -34,6 +34,15 @@ angular.module('neo4jApp.services')
     _fetch = (_store) ->
       return no unless _store
       $firebaseObject(_store).$loaded()
+
+    _push = (_store, data) ->
+      q = $q.defer()
+      completed = (err) ->
+        return q.resolve() unless err
+        q.reject err
+      return no unless _store
+      _store.set(data, completed)
+      q.promise
 
     _login = ->
       q = $q.defer()
@@ -55,13 +64,13 @@ angular.module('neo4jApp.services')
       )
       q.promise
 
-    # Return module interface
     return {
-    login: _login
-    logout: -> auth.signout()
-    authenticate: (profile, token) -> auth.authenticate profile, token
-    isAuthenticated: -> auth.isAuthenticated
-    fetch: _fetch
-    getUserStore: _getUserStore
+      login: _login
+      logout: -> auth.signout()
+      authenticate: (profile, token) -> auth.authenticate profile, token
+      isAuthenticated: -> auth.isAuthenticated
+      fetch: _fetch
+      push: _push
+      getUserStore: _getUserStore
     }
 ]

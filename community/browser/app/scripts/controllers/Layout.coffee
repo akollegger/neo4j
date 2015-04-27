@@ -22,27 +22,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 # Handles UI state and current page
 #
-angular.module('neo4jApp.controllers')
-  .controller 'SyncCtrl', [
-    '$scope'
-    '$rootScope'
-    'SyncService'
-    'CurrentUser'
-    ($scope, $rootScope, SyncService, CurrentUser) ->
-
-      if CurrentUser.isAuthenticated()
-        SyncService.fetch().then(
-          (res) ->
-            $scope.data = res.test
-        )
-
-      $rootScope.$on 'ntn:authenticated', (event, args) ->
-        SyncService.fetch().then(
-          (res) ->
-            $scope.data = res.test
-        )
-  ]
-
 
 angular.module('neo4jApp.controllers')
   .controller 'LayoutCtrl', [

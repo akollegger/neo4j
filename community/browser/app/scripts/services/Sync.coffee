@@ -31,11 +31,12 @@ angular.module('neo4jApp.services')
 
     setStorageJSON = (response) ->
       for k, v of response
-        localStorageService.set(k, v) unless k == 'history'
+        continue if /^\$/.test k
+        localStorageService.set(k, v) unless k in ['history', 'forEach']
 
       # Trigger localstorage event for updated_at last, since that is used
       # to set inSync to true
-      localStorageService.set('updated_at', response.updated_at)
+      localStorageService.set('updated_at', 1)
       response
 
     getStorageJSON = ->
@@ -44,50 +45,37 @@ angular.module('neo4jApp.services')
       d[k] = localStorageService.get(k) for k in keys
       JSON.stringify(d)
 
+     getStorage = ->
+       d = {}
+       d.documents = localStorageService.get 'documents'
+       d.folders = localStorageService.get 'folders'
+       d.grass = JSON.stringify localStorageService.get('grass')
+       d
+
     class SyncService
       constructor: ->
-        # Register listeners for localStorage updates and authentication changes
-        # $rootScope.$on 'LocalStorageModule.notification.setitem', Utils.debounce((evt, item) =>
-        #   # Only sync folders
-        #   return unless item.key in ['documents', 'folders']
-        #   @sync()
-        #   _ignoreSync = no
-        # , 100)
 
         $rootScope.$on 'LocalStorageModule.notification.setitem', (evt, item) =>
           return @setSyncedAt() if item.key is 'updated_at'
-          return if item.key in ['history']
+          return unless item.key in ['documents', 'folders', 'grass']
           @inSync = no
 
-        $rootScope.$on 'user:authenticated', (evt, authenticated) =>
+        $rootScope.$on 'ntn:authenticated', (evt, authenticated) =>
           @authenticated = authenticated
           @fetchAndUpdate() if authenticated
 
-      fetchAndUpdate: (autoConfirm = no) =>
-        currentTimestamp = parseInt(localStorageService.get('updated_at'), 10)
+      fetchAndUpdate: () =>
         @fetch().then( (response) =>
-          if response.updated_at isnt 0 and currentTimestamp isnt response.updated_at
-            if autoConfirm or confirm('Server data available, overwrite local?')
-              @setResponse(response)
-          else if currentTimestamp is response.updated_at
-            @setSyncedAt()
+          @setResponse(response)
         )
 
       fetch: =>
-        NTN.fetch(CurrentUser.getStore()).then(
-          (res) ->
-            res
-        )
+        NTN.fetch(CurrentUser.getStore())
 
       push: =>
-        #return if _ignoreSync
         return unless @authenticated
-        NTN.ajax({
-          contentType: 'application/json'
-          method: 'PUT'
-          url: '/api/v1/store?force=true'
-          data: getStorageJSON()
-        }).then(=> @fetchAndUpdate(yes) )
+        NTN.push(CurrentUser.getStore(), getStorage())
+        .then(=> @fetchAndUpdate() )
 
       setResponse: (response) =>
         @conflict = no
