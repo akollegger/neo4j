@@ -25,13 +25,43 @@ angular.module('neo4jApp.services')
   'Settings'
   'NTN'
   'localStorageService'
+  'AuthDataService'
   'jwtHelper'
   '$q'
   '$rootScope'
-  (Settings, NTN, localStorageService, jwtHelper, $q, $rootScope) ->
+  (Settings, NTN, localStorageService, AuthDataService, jwtHelper, $q, $rootScope) ->
     class CurrentUser
       _user: {}
       store: no
+
+      getStoreCreds: ->
+        local = localStorageService.get 'stores'
+        local || []
+
+      setStoreCreds: (creds_array) ->
+        localStorageService.set 'stores', creds_array
+
+      addCurrentStoreCreds: (id) ->
+        creds = @getStoreCreds()
+        current_creds = AuthDataService.getAuthData()
+        return unless current_creds
+        creds.push({store_id: id, creds: current_creds})
+        @setStoreCreds creds
+
+      removeCurrentStoreCreds: (id) ->
+        creds = @getStoreCreds()
+        for cred, i in creds
+          if cred.store_id is id
+            creds.splice i, 1
+            break
+        @setStoreCreds creds
+
+      getCurrentStoreCreds: (id) ->
+        creds = @getStoreCreds()
+        for cred in creds
+          if cred.store_id is id
+            return cred
+        return {}
 
       fetch: ->
         NTN.fetch @store
@@ -86,7 +116,7 @@ angular.module('neo4jApp.services')
 
       instance: -> angular.copy(@_user)
 
-      isAuthenticated: -> @_user?.user_id
+      isAuthenticated: -> NTN.isAuthenticated()
 
       autoLogin: ->
         return yes if NTN.isAuthenticated()

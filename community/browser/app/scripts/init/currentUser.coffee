@@ -5,8 +5,4 @@ angular.module('neo4jApp')
   (CurrentUser, $rootScope) ->
     $rootScope.$on 'ntn:authenticated', ->
       $rootScope.currentUser = CurrentUser.instance()
-
-    $rootScope.$on '$locationChangeStart', ->
-      CurrentUser.autoLogin()
-
 ]

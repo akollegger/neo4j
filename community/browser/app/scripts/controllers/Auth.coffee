@@ -26,14 +26,16 @@ angular.module('neo4jApp.controllers')
     'AuthService'
     'ConnectionStatusService'
     'Frame'
+    'CurrentUser'
     'Settings'
-    ($scope, AuthService, ConnectionStatusService, Frame, Settings) ->
+    ($scope, AuthService, ConnectionStatusService, Frame, CurrentUser, Settings) ->
       $scope.username = 'neo4j'
       $scope.password = ''
       $scope.current_password = ''
       $scope.connection_summary = ConnectionStatusService.getConnectionStatusSummary()
       $scope.static_user = $scope.connection_summary.user
       $scope.static_is_authenticated = $scope.connection_summary.is_connected
+      $scope.CurrentUser = CurrentUser
 
       $scope.authenticate = ->
         $scope.frame.resetError()

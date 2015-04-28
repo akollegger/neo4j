@@ -28,7 +28,9 @@ angular.module('neo4jApp.services')
     cached_authorization_data = localStorageService.get('authorization_data') || ''
     @setAuthData = (authdata) ->
       return unless authdata
-      encoded = $base64.encode(authdata)
+      @setEncodedAuthData $base64.encode(authdata)
+    @setEncodedAuthData = (encoded) ->
+      return unless encoded
       cached_authorization_data = encoded
       localStorageService.set('authorization_data', encoded)
     @clearAuthData = ->

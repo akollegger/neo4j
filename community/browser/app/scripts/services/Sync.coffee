@@ -49,6 +49,7 @@ angular.module('neo4jApp.services')
        d = {}
        d.documents = localStorageService.get 'documents'
        d.folders = localStorageService.get 'folders'
+       d.stores = localStorageService.get 'stores'
        d.grass = JSON.stringify localStorageService.get('grass')
        d
 
@@ -57,7 +58,7 @@ angular.module('neo4jApp.services')
 
         $rootScope.$on 'LocalStorageModule.notification.setitem', (evt, item) =>
           return @setSyncedAt() if item.key is 'updated_at'
-          return unless item.key in ['documents', 'folders', 'grass']
+          return unless item.key in ['documents', 'folders', 'grass', 'stores']
           @inSync = no
 
         $rootScope.$on 'ntn:authenticated', (evt, authenticated) =>
@@ -65,11 +66,14 @@ angular.module('neo4jApp.services')
           @fetchAndUpdate() if authenticated
 
       fetchAndUpdate: () =>
-        @fetch().then( (response) =>
+        promise = @fetch()
+        return unless promise
+        promise.then( (response) =>
           @setResponse(response)
         )
 
       fetch: =>
+        return unless @authenticated
         NTN.fetch(CurrentUser.getStore())
 
       push: =>
