@@ -1,0 +1,30 @@
+.inner
+  h4(ng-class='{subtitled: currentUser}')
+    .sub {{currentUser.name}}
+      small(ng-if='syncService.inSync') Synced&nbsp;
+        span(am-time-ago='syncService.lastSyncedAt')
+      small.error(ng-if='!syncService.inSync', ng-click='syncService.push()')
+        a Out of sync
+
+  h5 Local connection credentials
+  div(ng-show="CurrentUser.isAuthenticated() && !CurrentUser.getCurrentStoreCreds(neo4j.store_id).store_id")
+    p
+      | This Neo4j stores credentials is not synced with Neo4j Arc.
+    br
+    button.btn.btn-default(ng-click="CurrentUser.addCurrentStoreCreds(neo4j.store_id)") Sync with Neo4j Arc
+
+  div(ng-show="CurrentUser.isAuthenticated() && CurrentUser.getCurrentStoreCreds(neo4j.store_id).store_id")
+    p
+      | This Neo4j stores credentials is synced with Neo4j Arc.
+    br
+    button.btn.btn-default(ng-click="CurrentUser.removeCurrentStoreCreds(neo4j.store_id)") Remove from Neo4j Arc
+
+
+  h5 Actions
+  div(ng-if="currentUser")
+    p
+      button.btn.btn-danger(ng-click="CurrentUser.logout()") Log out
+    p
+      button.btn.btn-default(ng-click="syncService.push()") Push to server &#x25B2;
+    p
+      button.btn.btn-default(ng-click="syncService.fetchAndUpdate()") Fetch from server &#x25BC;

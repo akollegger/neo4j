@@ -58,10 +58,10 @@ div(ng-controller="AuthCtrl")
                       | You are connected as user:&nbsp;
                     code
                       | {{static_user}}
-                p(ng-show="CurrentUser.isAuthenticated() && !CurrentUser.getCurrentStoreCreds(neo4j.store_id).store_id", style="margin-top: 10px") This Neo4j stores credentials is not synced with Neo4j Arc.
+                //p(ng-show="CurrentUser.isAuthenticated() && !CurrentUser.getCurrentStoreCreds(neo4j.store_id).store_id", style="margin-top: 10px") This Neo4j stores credentials is not synced with Neo4j Arc.
                   br
                   button.btn.btn-default(ng-click="CurrentUser.addCurrentStoreCreds(neo4j.store_id)", style="margin-top: 10px") Sync with Neo4j Arc
-                p(ng-show="CurrentUser.isAuthenticated() && CurrentUser.getCurrentStoreCreds(neo4j.store_id).store_id", style="margin-top: 10px") This Neo4j stores credentials is synced with Neo4j Arc.
+                //p(ng-show="CurrentUser.isAuthenticated() && CurrentUser.getCurrentStoreCreds(neo4j.store_id).store_id", style="margin-top: 10px") This Neo4j stores credentials is synced with Neo4j Arc.
                   br
                   button.btn.btn-default(ng-click="CurrentUser.removeCurrentStoreCreds(neo4j.store_id)", style="margin-top: 10px") Remove from Neo4j Arc
               .details.col-sm-3(ng-hide="CurrentUser.isAuthenticated()")

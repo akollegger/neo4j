@@ -33,6 +33,7 @@ angular.module('neo4jApp.controllers')
       'UsageDataCollectionService'
       'CurrentUser'
       ($scope, $window, Server, Frame, AuthService, Settings, motdService, UDC, CurrentUser) ->
+        $scope.CurrentUser = CurrentUser
         $scope.kernel = {}
         refresh = ->
           return '' if $scope.unauthorized || $scope.offline
