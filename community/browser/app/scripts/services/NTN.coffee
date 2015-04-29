@@ -46,19 +46,29 @@ angular.module('neo4jApp.services')
 
     _login = ->
       q = $q.defer()
-      auth.signin({authParams: {scope: 'openid offline_access'}}, (profile, token, accessToken, state, refreshToken) ->
-        auth.getToken({
-          api: 'firebase'
-        }).then((delegation) ->
-          q.resolve(
-            profile: profile
-            token: token
-            accessToken: accessToken
-            state: state
-            refreshToken: refreshToken
-            data_token: delegation.id_token
+      auth.signin(
+        {
+          authParams: {scope: 'openid offline_access'},
+          icon: 'http://neo4j.com/wp-content/themes/neo4jweb/assets/images/neo4j-logo-2015.png',
+          dict: {
+            signin: {
+              title: 'Sign in'
+            }
+          }
+        }
+      , (profile, token, accessToken, state, refreshToken) ->
+          auth.getToken({
+            api: 'firebase'
+          }).then((delegation) ->
+            q.resolve(
+              profile: profile
+              token: token
+              accessToken: accessToken
+              state: state
+              refreshToken: refreshToken
+              data_token: delegation.id_token
+            )
           )
-        )
       , (err)->
         q.reject err
       )
