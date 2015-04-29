@@ -19,20 +19,10 @@ div(ng-controller="AuthCtrl")
                       | You are connected as user:&nbsp;
                     code
                       | {{connection_summary.user}}
-                p(ng-show="CurrentUser.isAuthenticated() && !CurrentUser.getCurrentStoreCreds(neo4j.store_id).store_id", style="margin-top: 10px") This Neo4j stores credentials is not synced with Neo4j Arc.
-                  br
-                  button.btn.btn-default(ng-click="CurrentUser.addCurrentStoreCreds(neo4j.store_id)", style="margin-top: 10px") Sync with Neo4j Arc
-                p(ng-show="CurrentUser.isAuthenticated() && CurrentUser.getCurrentStoreCreds(neo4j.store_id).store_id", style="margin-top: 10px") This Neo4j stores credentials is synced with Neo4j Arc.
-                  br
-                  button.btn.btn-default(ng-click="CurrentUser.removeCurrentStoreCreds(neo4j.store_id)", style="margin-top: 10px") Remove from Neo4j Arc
-              .details.col-sm-4(ng-show="!connection_summary.is_connected")
+              .details.col-sm-9(ng-show="!connection_summary.is_connected")
                 p You are not connected to the server.
-              .details.col-sm-4(ng-show="!connection_summary.authorization_required")
+              .details.col-sm-9(ng-show="!connection_summary.authorization_required")
                 p You have a working connection with the Neo4j database and server auth is disabled.
-              .details.col-sm-3(ng-hide="CurrentUser.isAuthenticated()")
-                include partials/arc-login
-              .details.col-sm-3(ng-show="CurrentUser.isAuthenticated()")
-                include partials/arc-loggedin
       .status-bar(ng-class='{error: frame.hasErrors, loading: frame.isLoading}')
         .status(ng-show="frame.detailedErrorText")
           .fa.fa-exclamation-triangle.icon-warning-sign &nbsp;

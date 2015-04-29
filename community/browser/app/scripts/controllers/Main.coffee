@@ -32,8 +32,11 @@ angular.module('neo4jApp.controllers')
       'motdService'
       'UsageDataCollectionService'
       'CurrentUser'
-      ($scope, $window, Server, Frame, AuthService, Settings, motdService, UDC, CurrentUser) ->
+      'ConnectionStatusService'
+      ($scope, $window, Server, Frame, AuthService, Settings, motdService, UDC, CurrentUser, ConnectionStatusService) ->
         $scope.CurrentUser = CurrentUser
+        $scope.ConnectionStatusService = ConnectionStatusService
+
         $scope.kernel = {}
         refresh = ->
           return '' if $scope.unauthorized || $scope.offline

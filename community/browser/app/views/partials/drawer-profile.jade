@@ -1,30 +1,33 @@
 .inner
-  h4(ng-class='{subtitled: currentUser}')
+  h4(ng-class='{subtitled: currentUser}', ng-if="currentUser")
     .sub {{currentUser.name}}
       small(ng-if='syncService.inSync') Synced&nbsp;
         span(am-time-ago='syncService.lastSyncedAt')
       small.error(ng-if='!syncService.inSync', ng-click='syncService.push()')
         a Out of sync
 
-  h5 Local connection credentials
-  div(ng-show="CurrentUser.isAuthenticated() && !CurrentUser.getCurrentStoreCreds(neo4j.store_id).store_id")
+  h5(ng-if="currentUser && ConnectionStatusService.isConnected()") Local connection credentials
+  div(ng-show="CurrentUser.isAuthenticated() && !CurrentUser.getCurrentStoreCreds(neo4j.store_id).store_id && ConnectionStatusService.isConnected()")
     p
-      | This Neo4j stores credentials is not synced with Neo4j Arc.
+      | This Neo4j connections credentials is not synced with Neo4j Arc.
     br
-    button.btn.btn-default(ng-click="CurrentUser.addCurrentStoreCreds(neo4j.store_id)") Sync with Neo4j Arc
+    button.btn.btn-popup(ng-click="CurrentUser.addCurrentStoreCreds(neo4j.store_id)") Sync with Neo4j Arc
 
-  div(ng-show="CurrentUser.isAuthenticated() && CurrentUser.getCurrentStoreCreds(neo4j.store_id).store_id")
+  div(ng-show="CurrentUser.isAuthenticated() && CurrentUser.getCurrentStoreCreds(neo4j.store_id).store_id && ConnectionStatusService.isConnected()")
     p
-      | This Neo4j stores credentials is synced with Neo4j Arc.
+      | This Neo4j connections credentials is synced with Neo4j Arc.
     br
-    button.btn.btn-default(ng-click="CurrentUser.removeCurrentStoreCreds(neo4j.store_id)") Remove from Neo4j Arc
+    button.btn.btn-popup(ng-click="CurrentUser.removeCurrentStoreCreds(neo4j.store_id)") Remove from Neo4j Arc
 
 
-  h5 Actions
+  h5(ng-if="currentUser") Actions
   div(ng-if="currentUser")
     p
-      button.btn.btn-danger(ng-click="CurrentUser.logout()") Log out
+      button.btn.btn-popup(ng-click="syncService.push()") Push and overwrite remote &#x25B2;
     p
-      button.btn.btn-default(ng-click="syncService.push()") Push to server &#x25B2;
+      button.btn.btn-popup(ng-click="syncService.fetchAndUpdate()") Pull and overwrite local &#x25BC;
+
+  h5(ng-if="currentUser") Sign out
+  div(ng-if="currentUser")
     p
-      button.btn.btn-default(ng-click="syncService.fetchAndUpdate()") Fetch from server &#x25BC;
+      button.btn.btn-danger(ng-click="CurrentUser.logout(); toggleDrawer('profile') ") Sign out
