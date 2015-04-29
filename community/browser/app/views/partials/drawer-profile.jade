@@ -1,9 +1,10 @@
 .inner
-  h4(ng-class='{subtitled: currentUser}', ng-if="currentUser")
-    .sub {{currentUser.name}}
-      small(ng-if='syncService.inSync') Synced&nbsp;
+  h4.subtitled
+    .sub(ng-if="!currentUser") Neo4j Arc
+    .sub(ng-if="currentUser") {{currentUser.name}}
+      small(ng-if='syncService.inSync && currentUser') Synced&nbsp;
         span(am-time-ago='syncService.lastSyncedAt')
-      small.error(ng-if='!syncService.inSync', ng-click='syncService.push()')
+      small.error(ng-if='!syncService.inSync && currentUser', ng-click='syncService.push()')
         a Out of sync
 
   h5(ng-if="currentUser && ConnectionStatusService.isConnected()") Local connection credentials
@@ -31,3 +32,7 @@
   div(ng-if="currentUser")
     p
       button.btn.btn-danger(ng-click="CurrentUser.logout(); toggleDrawer('profile') ") Sign out
+
+  h5(ng-if="!currentUser") Sign in
+  div(ng-if="!currentUser")
+    button.btn.btn-popup(ng-click="CurrentUser.login()") Sign in to Neo4j Arc
