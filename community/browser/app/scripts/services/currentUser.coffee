@@ -110,6 +110,7 @@ angular.module('neo4jApp.services')
         localStorageService.remove 'ntn_refresh_token'
         localStorageService.remove 'ntn_profile'
         @loadUserFromLocalStorage()
+        $rootScope.currentUser = null
         NTN.logout()
         q.resolve()
         q.promise

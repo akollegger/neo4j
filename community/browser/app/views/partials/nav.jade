@@ -11,5 +11,10 @@
       a.fa.fa-star(ng-click='toggleDrawer("scripts"); syncService.fetchAndUpdate().then(syncService.push())')
     li(ng-class='{active: showingDrawer("info") }')
       a.fa.fa-info-circle(ng-click='toggleDrawer("info")')
-    li.bottom(ng-class='{active: showingDrawer("credits") }')
+  ul.nav.bottom
+    li.nav-user(ng-class='{active: showingDrawer("profile") }', ng-if='currentUser')
+      a(ng-click='toggleDrawer("profile")')
+        &nbsp;
+        .avatar(ng-style='{"background-image": "url("+currentUser.picture+")"}', ng-if='currentUser.picture')
+    li(ng-class='{active: showingDrawer("credits") }')
       a(ng-click='toggleDrawer("credits")') &#64;
