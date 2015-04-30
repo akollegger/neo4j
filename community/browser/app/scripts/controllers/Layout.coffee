@@ -144,6 +144,10 @@ angular.module('neo4jApp.controllers')
         if Settings.showVizDiagnostics
           $scope.visualizationStats = stats
 
+      $scope.$on 'LocalStorageModule.notification.setitem', (evt, item) ->
+        return unless item.key is 'grass'
+        GraphStyle.reloadFromStorage()
+
       resizeStream = Utils.debounce((ignored) ->
         unless $scope.editor.maximized
           $('#stream').css
