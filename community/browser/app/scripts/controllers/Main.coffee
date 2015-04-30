@@ -28,12 +28,13 @@ angular.module('neo4jApp.controllers')
       'Server'
       'Frame'
       'AuthService'
+      'AuthDataService'
       'Settings'
       'motdService'
       'UsageDataCollectionService'
       'CurrentUser'
       'ConnectionStatusService'
-      ($scope, $window, Server, Frame, AuthService, Settings, motdService, UDC, CurrentUser, ConnectionStatusService) ->
+      ($scope, $window, Server, Frame, AuthService, AuthDataService, Settings, motdService, UDC, CurrentUser, ConnectionStatusService) ->
         $scope.CurrentUser = CurrentUser
         $scope.ConnectionStatusService = ConnectionStatusService
 
@@ -45,7 +46,7 @@ angular.module('neo4jApp.controllers')
           $scope.propertyKeys = Server.propertyKeys()
           $scope.server = Server.info()
           $scope.host = $window.location.host
-          fetchServerInfo()
+          fetchJMX()
         $scope.identity = angular.identity
 
         $scope.motd = motdService
@@ -79,7 +80,7 @@ angular.module('neo4jApp.controllers')
         $scope.$on 'auth:status_updated', () ->
           $scope.check()
 
-        fetchServerInfo = ->
+        fetchJMX = ->
           Server.jmx(
             [
               "org.neo4j:instance=kernel#0,name=Configuration"
@@ -91,8 +92,12 @@ angular.module('neo4jApp.controllers')
                 $scope.kernel[a.name] = a.value
             UDC.set('store_id',   $scope.kernel['StoreId'])
             UDC.set('neo4j_version', $scope.server.neo4j_version)
-            $scope.neo4j.store_id = $scope.kernel['StoreId']
           ).error((r)-> $scope.kernel = {})
+
+        fetchServerInfo = ->
+          Server.get('/db/manage/server/storeid').success((response) ->
+            $scope.neo4j.store_id = response.storeid
+          )
 
         pickFirstFrame = (ls_setup = no) ->
           AuthService.hasValidAuthorization().then(
