@@ -56,6 +56,7 @@ public class AuthorizationFilter implements Filter
                     new UriPathWildcardMatcher( "/browser*" ),
                     new UriPathWildcardMatcher( "/webadmin*" ),
                     new UriPathWildcardMatcher( "/" ),
+                    new UriPathWildcardMatcher( "/db/manage/server/*")
             };
 
     private final UriPathWildcardMatcher passwordChangeWhitelist = new UriPathWildcardMatcher( "/user/*" );

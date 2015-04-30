@@ -30,6 +30,7 @@ import org.neo4j.server.rest.management.MonitorService;
 import org.neo4j.server.rest.management.RootService;
 import org.neo4j.server.rest.management.VersionAndEditionService;
 import org.neo4j.server.rest.management.console.ConsoleService;
+import org.neo4j.server.rest.management.DoNotMergeStoreIdService;
 
 import static org.neo4j.server.JAXRSHelper.listFrom;
 
@@ -58,7 +59,9 @@ public class ManagementApiModule implements ServerModule
                 MonitorService.class.getName(),
                 RootService.class.getName(),
                 ConsoleService.class.getName(),
-                VersionAndEditionService.class.getName() );
+                VersionAndEditionService.class.getName(),
+								DoNotMergeStoreIdService.class.getName()
+								);
     }
 
     @Override
