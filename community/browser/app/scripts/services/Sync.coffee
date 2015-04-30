@@ -29,10 +29,13 @@ angular.module('neo4jApp.services')
   '$rootScope'
   (localStorageService, NTN, CurrentUser, Utils, $rootScope) ->
 
+    sync_keys = ['documents', 'folders', 'grass', 'stores']
     setStorageJSON = (response) ->
-      for k, v of response
-        continue if /^\$/.test k
-        localStorageService.set(k, v) unless k in ['history', 'forEach']
+      for key in sync_keys
+        if typeof response[key] is 'undefined'
+          localStorageService.remove key
+          continue
+        localStorageService.set key, response[key]
 
       # Trigger localstorage event for updated_at last, since that is used
       # to set inSync to true
@@ -62,9 +65,10 @@ angular.module('neo4jApp.services')
 
         $rootScope.$on 'LocalStorageModule.notification.setitem', (evt, item) =>
           return @setSyncedAt() if item.key is 'updated_at'
-          return unless item.key in ['documents', 'folders', 'grass', 'stores']
-          return if $rootScope.ntn_data[item.key] == item.newvalue
+          return unless item.key in sync_keys
           newvalue = if item.key is 'grass' then item.newvalue else JSON.parse item.newvalue
+          return @inSync = yes unless $rootScope.ntn_data
+          return if $rootScope.ntn_data[item.key] is newvalue
           $rootScope.ntn_data[item.key] = newvalue
           if @authenticated
             @inSync = yes

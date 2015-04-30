@@ -95,36 +95,45 @@ angular.module('neo4jApp.controllers')
           ).error((r)-> $scope.kernel = {})
 
         fetchServerInfo = ->
-          Server.get('/db/manage/server/storeid').success((response) ->
+          Server.get('/db/manage/server/storeid/').success((response) ->
             $scope.neo4j.store_id = response.storeid
           )
+        fetchServerInfo()
 
         pickFirstFrame = (ls_setup = no) ->
+          CurrentUser.autoLogin()
           AuthService.hasValidAuthorization().then(
             ->
-              CurrentUser.autoLogin()
+              Frame.closeWhere "#{Settings.cmdchar}server connect"
               Frame.create({input:"#{Settings.initCmd}"})
             ,
             (r) ->
               if r.status is 404
+                Frame.closeWhere "#{Settings.cmdchar}server connect"
                 Frame.create({input:"#{Settings.initCmd}"})
               else
-                auto = CurrentUser.autoLogin()
-                if !ls_setup and auto
-                  fetchServerInfo().then( ->
-                    store_creds = CurrentUser.getCurrentStoreCreds $scope.neo4j.store_id
-                    return Frame.createOne({input:"#{Settings.cmdchar}server connect"}) unless store_creds.creds
-                    AuthDataService.setEncodedAuthData store_creds.creds
-                    AuthService.hasValidAuthorization().catch(->
-                      CurrentUser.removeCurrentStoreCreds $scope.neo4j.store_id
-                    ).finally(-> pickFirstFrame yes)
-                  ,->
-                    Frame.createOne({input:"#{Settings.cmdchar}server connect"})
-                  )
+                if !ls_setup and CurrentUser.isAuthenticated()
+                  tryAutoConnect()
                   return
                 Frame.createOne({input:"#{Settings.cmdchar}server connect"})
           )
         pickFirstFrame()
+
+        tryAutoConnect = ->
+          fetchServerInfo().then( ->
+            store_creds = CurrentUser.getCurrentStoreCreds $scope.neo4j.store_id
+            return Frame.createOne({input:"#{Settings.cmdchar}server connect"}) unless store_creds.creds
+            AuthDataService.setEncodedAuthData store_creds.creds
+            AuthService.hasValidAuthorization().catch(->
+              CurrentUser.removeCurrentStoreCreds $scope.neo4j.store_id
+            ).finally(-> pickFirstFrame yes)
+          ,->
+            Frame.createOne({input:"#{Settings.cmdchar}server connect"})
+          )
+
+        $scope.$on 'ntn:data_loaded', (evt, authenticated) ->
+          return if ConnectionStatusService.isConnected()
+          tryAutoConnect()
 
         $scope.$watch 'server', (val) ->
           return '' if not val
@@ -139,7 +148,8 @@ angular.module('neo4jApp.controllers')
   .run([
     '$rootScope'
     'Editor'
-    ($scope, Editor) ->
+    'SyncService'
+    ($scope, Editor, SyncService) ->
       $scope.unauthorized = yes
       # everything should be assembled
       # Editor.setContent(":play intro")
