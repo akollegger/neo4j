@@ -39,11 +39,18 @@
   user-select: none
   > .nav
     padding: 0
+    &.bottom
+      position: absolute
+      bottom: 0
+      border-bottom: none
+      border-top: 1px solid #5D6370
     > li
       padding: 0
       margin: 0
       border-bottom: 1px solid #5D6370
       position: relative
+      &.nav-user > a
+        left: -8px
 
       // fix quirk with item not being selected when clicking moving balls
       .cover
@@ -51,11 +58,6 @@
         cursor: pointer
         z-index: 1
 
-      &.bottom
-        position: absolute
-        bottom: 0
-        border-bottom: none
-        border-top: 1px solid #5D6370
       &.nav-header
         &.active
           border-color: #2D2F36
@@ -81,8 +83,16 @@
         font-size: 28px
         &:hover
           color: #fff
-        &:hover
           background: none
+        .avatar
+          width: 40px
+          height: 40px
+          background-size: cover
+          position: absolute
+          top: 8px
+          left: 27px
+          border-radius: 50%
+          border: 2px solid #d8dde2
       &.active
         > a
           color: #fff

@@ -31,30 +31,21 @@ angular.module('neo4jApp.controllers')
       'Settings'
       'motdService'
       'UsageDataCollectionService'
-      ($scope, $window, Server, Frame, AuthService, Settings, motdService, UDC) ->
+      'CurrentUser'
+      'ConnectionStatusService'
+      ($scope, $window, Server, Frame, AuthService, Settings, motdService, UDC, CurrentUser, ConnectionStatusService) ->
+        $scope.CurrentUser = CurrentUser
+        $scope.ConnectionStatusService = ConnectionStatusService
+
+        $scope.kernel = {}
         refresh = ->
           return '' if $scope.unauthorized || $scope.offline
-
           $scope.labels = Server.labels()
           $scope.relationships = Server.relationships()
           $scope.propertyKeys = Server.propertyKeys()
           $scope.server = Server.info()
           $scope.host = $window.location.host
-          $scope.kernel = {}
-          # gather info from jmx
-          Server.jmx(
-            [
-              "org.neo4j:instance=kernel#0,name=Configuration"
-              "org.neo4j:instance=kernel#0,name=Kernel"
-              "org.neo4j:instance=kernel#0,name=Store file sizes"
-            ]).success((response) ->
-              for r in response
-                for a in r.attributes
-                  $scope.kernel[a.name] = a.value
-              UDC.set('store_id',   $scope.kernel['StoreId'])
-              UDC.set('neo4j_version', $scope.server.neo4j_version)
-            ).error((r)-> $scope.kernel = {})
-
+          fetchServerInfo()
         $scope.identity = angular.identity
 
         $scope.motd = motdService
@@ -88,17 +79,47 @@ angular.module('neo4jApp.controllers')
         $scope.$on 'auth:status_updated', () ->
           $scope.check()
 
-        # Authorization
-        AuthService.hasValidAuthorization().then(
-          ->
-            Frame.create({input:"#{Settings.initCmd}"})
-          ,
-          (r) ->
-            if r.status is 404
+        fetchServerInfo = ->
+          Server.jmx(
+            [
+              "org.neo4j:instance=kernel#0,name=Configuration"
+              "org.neo4j:instance=kernel#0,name=Kernel"
+              "org.neo4j:instance=kernel#0,name=Store file sizes"
+            ]).success((response) ->
+            for r in response
+              for a in r.attributes
+                $scope.kernel[a.name] = a.value
+            UDC.set('store_id',   $scope.kernel['StoreId'])
+            UDC.set('neo4j_version', $scope.server.neo4j_version)
+            $scope.neo4j.store_id = $scope.kernel['StoreId']
+          ).error((r)-> $scope.kernel = {})
+
+        pickFirstFrame = (ls_setup = no) ->
+          AuthService.hasValidAuthorization().then(
+            ->
+              CurrentUser.autoLogin()
               Frame.create({input:"#{Settings.initCmd}"})
-            else
-              Frame.createOne({input:"#{Settings.cmdchar}server connect"})
-        )
+            ,
+            (r) ->
+              if r.status is 404
+                Frame.create({input:"#{Settings.initCmd}"})
+              else
+                auto = CurrentUser.autoLogin()
+                if !ls_setup and auto
+                  fetchServerInfo().then( ->
+                    store_creds = CurrentUser.getCurrentStoreCreds $scope.neo4j.store_id
+                    return Frame.createOne({input:"#{Settings.cmdchar}server connect"}) unless store_creds.creds
+                    AuthDataService.setEncodedAuthData store_creds.creds
+                    AuthService.hasValidAuthorization().catch(->
+                      CurrentUser.removeCurrentStoreCreds $scope.neo4j.store_id
+                    ).finally(-> pickFirstFrame yes)
+                  ,->
+                    Frame.createOne({input:"#{Settings.cmdchar}server connect"})
+                  )
+                  return
+                Frame.createOne({input:"#{Settings.cmdchar}server connect"})
+          )
+        pickFirstFrame()
 
         $scope.$watch 'server', (val) ->
           return '' if not val

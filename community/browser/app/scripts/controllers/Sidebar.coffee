@@ -28,7 +28,8 @@ angular.module('neo4jApp.controllers')
     'Frame'
     'Folder'
     'GraphStyle'
-    ($scope, Document, Editor, Frame, Folder, GraphStyle) ->
+    'SyncService'
+    ($scope, Document, Editor, Frame, Folder, GraphStyle, SyncService) ->
       ###*
        * Local methods
       ###
@@ -108,7 +109,11 @@ angular.module('neo4jApp.controllers')
 
       $scope.folders = nestedFolderStructure()
 
-      $scope.$on 'localStorage:updated', ->
+      $scope.$on 'LocalStorageModule.notification.setitem', (evt, item) ->
+        # Reload folders and documents
+        return unless item.key in ['documents', 'folders']
+        Folder.fetch()
+        Document.fetch()
         $scope.folders = nestedFolderStructure()
 
       # Expose editor service to be able to play saved scripts
@@ -122,4 +127,5 @@ angular.module('neo4jApp.controllers')
         query.replace(/<token>/g, escapedToken)
 
       $scope.folderService = Folder
+      $scope.syncService = SyncService
   ]
