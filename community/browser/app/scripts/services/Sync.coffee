@@ -64,7 +64,8 @@ angular.module('neo4jApp.services')
           return @setSyncedAt() if item.key is 'updated_at'
           return unless item.key in ['documents', 'folders', 'grass', 'stores']
           return if $rootScope.ntn_data[item.key] == item.newvalue
-          $rootScope.ntn_data[item.key] = item.newvalue
+          newvalue = if item.key is 'grass' then item.newvalue else JSON.parse item.newvalue
+          $rootScope.ntn_data[item.key] = newvalue
           if @authenticated
             @inSync = yes
             @setSyncedAt()
