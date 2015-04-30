@@ -22,9 +22,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 angular.module('neo4jApp.services')
 .factory 'NTN', [
-  'auth', 'Settings', '$q', '$firebaseAuth', '$firebaseObject'
-  (auth, Settings, $q, $firebaseAuth, $firebaseObject) ->
-
+  'auth', 'Settings', '$q', '$firebaseAuth', '$firebaseObject', '$rootScope'
+  (auth, Settings, $q, $firebaseAuth, $firebaseObject, $rootScope) ->
+    _unbind = ->
     _getUserStore = (id, token) ->
       ref = new Firebase("https://fiery-heat-7952.firebaseio.com/users/#{id}/")
       fbauth = $firebaseAuth ref
@@ -33,7 +33,11 @@ angular.module('neo4jApp.services')
 
     _fetch = (_store) ->
       return no unless _store
-      $firebaseObject(_store).$loaded()
+      sync_object = $firebaseObject(_store)
+      sync_object.$bindTo($rootScope, 'ntn_data').then((unbind) ->
+        _unbind = unbind
+      )
+      sync_object.$loaded()
 
     _push = (_store, data) ->
       q = $q.defer()
@@ -76,7 +80,9 @@ angular.module('neo4jApp.services')
 
     return {
       login: _login
-      logout: -> auth.signout()
+      logout: ->
+        auth.signout()
+        _unbind()
       authenticate: (profile, token) -> auth.authenticate profile, token
       isAuthenticated: -> auth.isAuthenticated
       fetch: _fetch

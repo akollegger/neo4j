@@ -8,7 +8,7 @@
           .ball.two
           .ball.three
     li(ng-class='{active: showingDrawer("scripts") }')
-      a.fa.fa-star(ng-click='toggleDrawer("scripts"); syncService.fetchAndUpdate().then(syncService.push())')
+      a.fa.fa-star(ng-click='toggleDrawer("scripts")')
     li(ng-class='{active: showingDrawer("info") }')
       a.fa.fa-info-circle(ng-click='toggleDrawer("info")')
   ul.nav.bottom

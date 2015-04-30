@@ -45,13 +45,17 @@ angular.module('neo4jApp.services')
       d[k] = localStorageService.get(k) for k in keys
       JSON.stringify(d)
 
-     getStorage = ->
-       d = {}
-       d.documents = localStorageService.get 'documents'
-       d.folders = localStorageService.get 'folders'
-       d.stores = localStorageService.get 'stores'
-       d.grass = JSON.stringify localStorageService.get('grass')
-       d
+    getStorage = ->
+      d = {}
+      d.documents = localStorageService.get 'documents'
+      d.folders = localStorageService.get 'folders'
+      d.stores = localStorageService.get 'stores'
+      d.grass = JSON.stringify localStorageService.get('grass')
+      d
+
+    $rootScope.$watch 'ntn_data', (ntn_data) ->
+      return unless ntn_data
+      setStorageJSON ntn_data
 
     class SyncService
       constructor: ->
@@ -59,7 +63,13 @@ angular.module('neo4jApp.services')
         $rootScope.$on 'LocalStorageModule.notification.setitem', (evt, item) =>
           return @setSyncedAt() if item.key is 'updated_at'
           return unless item.key in ['documents', 'folders', 'grass', 'stores']
-          @inSync = no
+          return if $rootScope.ntn_data[item.key] == item.newvalue
+          $rootScope.ntn_data[item.key] = item.newvalue
+          if @authenticated
+            @inSync = yes
+            @setSyncedAt()
+          else
+            @inSync = no
 
         $rootScope.$on 'ntn:authenticated', (evt, authenticated) =>
           @authenticated = authenticated
