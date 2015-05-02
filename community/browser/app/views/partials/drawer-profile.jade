@@ -1,38 +1,48 @@
 .inner
   h4.subtitled
-    .sub(ng-if="!currentUser") Neo4j Arc
+    .sub(ng-if="!currentUser") Neo4j Sync
     .sub(ng-if="currentUser") {{currentUser.name}}
       small(ng-if='syncService.inSync && currentUser') Synced&nbsp;
         span(am-time-ago='syncService.lastSyncedAt')
       small.error(ng-if='!syncService.inSync && currentUser', ng-click='syncService.push()')
         a Out of sync
 
-  h5(ng-if="currentUser && ConnectionStatusService.isConnected()") Local connection credentials
+  h5(ng-if="currentUser && ConnectionStatusService.isConnected()") Connection credentials
   div(ng-show="CurrentUser.isAuthenticated() && !CurrentUser.getCurrentStoreCreds(neo4j.store_id).store_id && ConnectionStatusService.isConnected()")
     p
-      | This Neo4j connections credentials is not synced with Neo4j Arc.
+      | Current Neo4j connection 
+      i is not 
+      | being synced.
     br
-    button.btn.btn-popup(ng-click="CurrentUser.addCurrentStoreCreds(neo4j.store_id)") Sync with Neo4j Arc
+    button.btn.btn-popup(ng-click="CurrentUser.addCurrentStoreCreds(neo4j.store_id)") Sync credentials
 
   div(ng-show="CurrentUser.isAuthenticated() && CurrentUser.getCurrentStoreCreds(neo4j.store_id).store_id && ConnectionStatusService.isConnected()")
     p
-      | This Neo4j connections credentials is synced with Neo4j Arc.
+      | Current Neo4j connection 
+      i is 
+      | being synced.
     br
-    button.btn.btn-popup(ng-click="CurrentUser.removeCurrentStoreCreds(neo4j.store_id)") Remove from Neo4j Arc
+    button.btn.btn-popup(ng-click="CurrentUser.removeCurrentStoreCreds(neo4j.store_id)") Forget credentials
 
 
   h5(ng-if="currentUser") Actions
   div(ng-if="currentUser")
     p
-      button.btn.btn-popup(ng-click="syncService.push()") Push and overwrite remote &#x25B2;
+      button.btn.btn-popup(ng-click="syncService.push()") Push to overwrite remote &#x25B2;
     p
-      button.btn.btn-popup(ng-click="syncService.fetchAndUpdate()") Pull and overwrite local &#x25BC;
+      button.btn.btn-popup(ng-click="syncService.fetchAndUpdate()") Pull to overwrite local &#x25BC;
 
-  h5(ng-if="currentUser") Sign out
+  //- h5(ng-if="currentUser") Sign out
   div(ng-if="currentUser")
+    p &nbsp;
     p
       button.btn.btn-danger(ng-click="CurrentUser.logout(); toggleDrawer('profile') ") Sign out
 
-  h5(ng-if="!currentUser") Sign in
+  //- h5(ng-if="!currentUser") Sign in
   div(ng-if="!currentUser")
-    button.btn.btn-popup(ng-click="CurrentUser.login()") Sign in to Neo4j Arc
+    p &nbsp;
+    button.btn.btn-popup(ng-click="CurrentUser.login()") Sign in
+    
+footer
+  p What's this? 
+    a(href="http://neo4j.com/neo4j-sync") Learn More
